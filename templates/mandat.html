@@ -73,10 +73,72 @@
         <select id="geburts-jahr" name="geburts-jahr" required aria-label="Jahr"></select>
       </div>
       <!-- ... Checkboxen wie gehabt ... -->
-      <fieldset class="checkbox-group">
-        <legend>Versichert bei folgenden Gesellschaften:</legend>
-        <!-- ... alle Labels ... -->
-      </fieldset>
+<fieldset class="checkbox-group">
+  <legend>Versichert bei folgenden Gesellschaften:</legend>
+  <label>
+    <input type="checkbox" name="versicherer" value="Baloise" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Baloise_Logo_2022.svg/1920px-Baloise_Logo_2022.svg.png" alt="Baloise" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="AXA" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/AXA_Versicherungen_Logo.svg/1024px-AXA_Versicherungen_Logo.svg.png" alt="AXA" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Generali" />
+    <img src="https://upload.wikimedia.org/wikipedia/de/thumb/3/38/Generali_logo.svg/1024px-Generali_logo.svg.png" alt="Generali" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Helvetia" />
+    <img src="https://upload.wikimedia.org/wikipedia/de/thumb/f/ff/Helvetia_%28Versicherung%29_logo.svg/1920px-Helvetia_%28Versicherung%29_logo.svg.png" alt="Helvetia" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Mobiliar" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Mobiliar_Logo.png" alt="Mobiliar" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Zurich" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e3/Zurich_Insurance_Group_Logo_Horizontal.svg" alt="Zurich" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Vaudoise" />
+    <img src="https://upload.wikimedia.org/wikipedia/de/thumb/c/cf/Vaudoise_Logo.svg/1920px-Vaudoise_Logo.svg.png" alt="Vaudoise" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Allianz" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Allianz.svg/1920px-Allianz.svg.png" alt="Allianz" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+  <label>
+    <input type="checkbox" name="versicherer" value="Smile" />
+    <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/Smile.direct_versicherungen.png" alt="Smile" />
+    <span class="checkmark">
+      <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
+    </span>
+  </label>
+</fieldset>
       <label>Unterschrift:</label>
       <canvas id="signature-pad" width="600" height="150"></canvas>
       <button type="button" class="btn-clear-sign" onclick="clearSignature()">Unterschrift löschen</button>
