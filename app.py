@@ -85,24 +85,25 @@ E-Mail: {email}
         # --------
         if email:
             kunden_msg = MIMEMultipart()
-            kunden_msg["Subject"] = "Ihre Mandatsanfrage bei TradeSource"
+            kunden_msg["Subject"] = "Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
 
             kunden_text = f"""\
 Hallo {name},
 
-Herzlichen Dank für Ihr Vertrauen und Ihre Mandatsanfrage bei TradeSource!
+Herzlichen Dank für Dein Vertrauen und Deine Mandatsanfrage bei TradeSource!
 
-Wir freuen uns besonders, dass Sie sich für unseren kostenlosen Service entschieden haben. So profitieren Sie nicht nur von den günstigsten Versicherungspreisen – sondern auch von einer völlig unverbindlichen und transparenten Beratung.
+Wir freuen uns sehr, dass Du Dich für unseren kostenlosen Service entschieden hast. So profitierst Du nicht nur von den günstigsten Versicherungspreisen – sondern auch von einer völlig unverbindlichen und transparenten Beratung.
 
-Unser Versprechen: Sie erhalten garantiert die besten Konditionen am Markt, ohne versteckte Kosten. Lehnen Sie sich entspannt zurück – wir kümmern uns um den Rest!
+Unser Versprechen: Du erhältst garantiert die besten Konditionen am Markt, ohne versteckte Kosten. Lehn Dich entspannt zurück – wir kümmern uns um den Rest!
 
-Bei Fragen oder Wünschen sind wir jederzeit persönlich für Sie da. 
-TradeSource – Ihr Partner für starke Leistungen und den fairsten Preis.
+Wenn Du Fragen oder Wünsche hast, sind wir jederzeit persönlich für Dich da.
+
+TradeSource – Dein Partner für starke Leistungen und den fairsten Preis.
 
 Freundliche Grüße  
-Ihr TradeSource-Team
+Dein TradeSource-Team
 
 Telefon: 044 123 45 67  
 E-Mail: info@tradesource.ch  
