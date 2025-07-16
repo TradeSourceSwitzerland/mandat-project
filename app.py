@@ -14,7 +14,14 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))  # Default 465
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "Bambolu1*")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD") or "<set in environment>"
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
+
+if EMAIL_HOST_PASSWORD == "<set in environment>":
+    raise RuntimeError(
+        "EMAIL_HOST_PASSWORD is not set. Please set the environment variable."
+    )
+
 
 @app.route("/api/sendmail", methods=["POST"])
 def sendmail():
