@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 import smtplib
 from email.mime.text import MIMEText
@@ -8,12 +9,12 @@ import ssl
 
 app = Flask(__name__)
 
-# SMTP Server Konfiguration
-EMAIL_HOST = "smtp.ionos.de"
-EMAIL_PORT = 465  # SSL Port
-EMAIL_HOST_USER = "info@tradesource.ch"    # Deine Mailadresse
-EMAIL_HOST_PASSWORD = "Bambolu1*"           # Dein SMTP-Passwort
-EMAIL_TO = "info@tradesource.ch"            # Empfängeradresse (kann dieselbe sein)
+# SMTP Server Konfiguration aus Umgebungsvariablen
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))  # Default 465
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "Bambolu1*")
+EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
 
 @app.route("/api/sendmail", methods=["POST"])
 def sendmail():
