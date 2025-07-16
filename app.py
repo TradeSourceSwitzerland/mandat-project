@@ -59,6 +59,7 @@ E-Mail: {email}
         msg["To"] = EMAIL_TO
         msg.attach(MIMEText(mailtext, "plain"))
 
+        pdf_bytes = None
         if pdf_base64:
             try:
                 pdf_bytes = base64.b64decode(pdf_base64)
@@ -72,11 +73,58 @@ E-Mail: {email}
             print("Warnung: Kein PDF im Request enthalten.")
 
         context = ssl.create_default_context()
+        # Sende interne Mail an Admin
         with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
             server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
             server.sendmail(EMAIL_HOST_USER, EMAIL_TO, msg.as_string())
 
-        print("E-Mail erfolgreich gesendet ✅")
+        print("E-Mail an Admin erfolgreich gesendet ✅")
+
+        # --------
+        # Sende Bestätigungsmail an den Kunden
+        # --------
+        if email:
+            kunden_msg = MIMEMultipart()
+            kunden_msg["Subject"] = "Ihre Mandatsanfrage bei TradeSource"
+            kunden_msg["From"] = EMAIL_HOST_USER
+            kunden_msg["To"] = email
+
+            kunden_text = f"""\
+Hallo {name},
+
+Herzlichen Dank für Ihr Vertrauen und Ihre Mandatsanfrage bei TradeSource!
+
+Wir freuen uns besonders, dass Sie sich für unseren kostenlosen Service entschieden haben. So profitieren Sie nicht nur von den günstigsten Versicherungspreisen – sondern auch von einer völlig unverbindlichen und transparenten Beratung.
+
+Unser Versprechen: Sie erhalten garantiert die besten Konditionen am Markt, ohne versteckte Kosten. Lehnen Sie sich entspannt zurück – wir kümmern uns um den Rest!
+
+Bei Fragen oder Wünschen sind wir jederzeit persönlich für Sie da. 
+TradeSource – Ihr Partner für starke Leistungen und den fairsten Preis.
+
+Freundliche Grüße  
+Ihr TradeSource-Team
+
+Telefon: 044 123 45 67  
+E-Mail: info@tradesource.ch  
+www.tradesource.ch
+"""
+
+            kunden_msg.attach(MIMEText(kunden_text, "plain"))
+
+            # Optional: PDF auch an den Kunden anhängen
+            if pdf_bytes:
+                part = MIMEApplication(pdf_bytes, Name=filename)
+                part['Content-Disposition'] = f'attachment; filename="{filename}"'
+                kunden_msg.attach(part)
+
+            with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
+                server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+                server.sendmail(EMAIL_HOST_USER, email, kunden_msg.as_string())
+
+            print("Bestätigungsmail an Kunde erfolgreich gesendet ✅")
+        else:
+            print("Keine Kunden-E-Mail angegeben, Bestätigungsmail wird nicht versendet.")
+
         return jsonify({"success": True})
 
     except Exception as e:
