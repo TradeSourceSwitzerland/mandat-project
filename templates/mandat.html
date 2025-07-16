@@ -193,11 +193,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Canvas Signatur
   const canvas = document.getElementById("signature-pad");
-  const ctx = canvas.getContext("2d");
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
+  const ctx    = canvas.getContext("2d");
+  ctx.lineWidth   = 2;
+  ctx.lineCap     = "round";
   ctx.strokeStyle = "#1e293b";
-  let drawing = false;
+  let drawing      = false;
+
+  // Funktion, die die Canvas-Pixelgröße dem CSS-Layout anpasst
+  function resizeCanvas() {
+    // passt interne Pixelgröße an die gerenderte Breite an
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = 150;
+
+    // Zeichen‑Settings nach Resize wiederherstellen
+    ctx.lineWidth   = 2;
+    ctx.lineCap     = "round";
+    ctx.strokeStyle = "#1e293b";
+  }
+
+  // Einmal beim Laden und bei jeder Fenster-Größenänderung
+  window.addEventListener('load',  resizeCanvas);
+  window.addEventListener('resize', resizeCanvas);
 
   function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
