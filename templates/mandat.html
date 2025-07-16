@@ -301,7 +301,7 @@
         return;
       }
 
-      const geburtsdatumStr = `${String(tag).padStart(2,"0")}.${String(monat).padStart(2,"0")}.${jahr}`;
+      const geburtsdatumStr = ${String(tag).padStart(2,"0")}.${String(monat).padStart(2,"0")}.${jahr};
       const signatureDataUrl = canvas.toDataURL();
       const versichererAuswahl = formData.getAll("versicherer");
       const ortText = ort_full.split(",")[1]?.trim() || ort_full;
@@ -313,7 +313,7 @@
       const zeitText =
         String(now.getHours()).padStart(2, "0") + ":" +
         String(now.getMinutes()).padStart(2, "0");
-      const ort_datum = `${ortText}, ${datumText}`;
+      const ort_datum = ${ortText}, ${datumText};
 
       try {
         const existingPdfBytes = await fetch(
@@ -339,9 +339,9 @@
         page1.drawText(email, { x: 170, y: 564, size: 11 });
         page1.drawText(geburtsdatumStr, { x: 390, y: 564, size: 11 });
 
-        page1.drawText(`IP: ${ipAdresse}`, { x: 450, y: 40, size: 9 });
-        page1.drawText(`Datum: ${datumText}`, { x: 450, y: 28, size: 9 });
-        page1.drawText(`Uhrzeit: ${zeitText}`, { x: 450, y: 16, size: 9 });
+        page1.drawText(IP: ${ipAdresse}, { x: 450, y: 40, size: 9 });
+        page1.drawText(Datum: ${datumText}, { x: 450, y: 28, size: 9 });
+        page1.drawText(Uhrzeit: ${zeitText}, { x: 450, y: 16, size: 9 });
 
         page1.drawText(ort_datum, { x: 145, y: 227, size: 11 });
 
@@ -378,34 +378,10 @@
         });
 
         const pdfBytes = await pdfDoc.save();
-        // Mailversand an Flask-API
-const mailForm = new FormData();
-mailForm.append("name", name);
-mailForm.append("email", email);
-mailForm.append("ort", ort_full);
-mailForm.append("geburtsdatum", geburtsdatumStr);
-mailForm.append("ip", ipAdresse);
-mailForm.append("timestamp", `${datumText} ${zeitText}`);
-mailForm.append("firma", firma);
-mailForm.append("tel", tel_privat);
-mailForm.append("adresse", adresse);
-mailForm.append("versicherer", versichererAuswahl.join(", "));
-mailForm.append("pdf", new Blob([pdfBytes], { type: "application/pdf" }), `Mandat_${name.replace(/ /g, "_")}.pdf`);
-
-try {
-  const res = await fetch("https://mandat-backend.onrender.com/api/sendmail", {
-    method: "POST",
-    body: mailForm
-  });
-  if (!res.ok) throw new Error("Mailversand fehlgeschlagen");
-  console.log("Mail erfolgreich gesendet.");
-} catch (mailErr) {
-  console.error("Mailversand-Fehler:", mailErr);
-}
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `Mandat_${name.replace(/ /g, "_")}.pdf`;
+        link.download = Mandat_${name.replace(/ /g, "_")}.pdf;
         link.click();
       } catch (err) {
         alert("Fehler beim Generieren des PDFs: " + err);
