@@ -378,6 +378,30 @@
         });
 
         const pdfBytes = await pdfDoc.save();
+        // Mailversand an Flask-API
+const mailForm = new FormData();
+mailForm.append("name", name);
+mailForm.append("email", email);
+mailForm.append("ort", ort_full);
+mailForm.append("geburtsdatum", geburtsdatumStr);
+mailForm.append("ip", ipAdresse);
+mailForm.append("timestamp", `${datumText} ${zeitText}`);
+mailForm.append("firma", firma);
+mailForm.append("tel", tel_privat);
+mailForm.append("adresse", adresse);
+mailForm.append("versicherer", versichererAuswahl.join(", "));
+mailForm.append("pdf", new Blob([pdfBytes], { type: "application/pdf" }), `Mandat_${name.replace(/ /g, "_")}.pdf`);
+
+try {
+  const res = await fetch("https://mandat-backend.onrender.com/api/sendmail", {
+    method: "POST",
+    body: mailForm
+  });
+  if (!res.ok) throw new Error("Mailversand fehlgeschlagen");
+  console.log("Mail erfolgreich gesendet.");
+} catch (mailErr) {
+  console.error("Mailversand-Fehler:", mailErr);
+}
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
