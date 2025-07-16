@@ -3,14 +3,16 @@ import ssl
 import base64
 import smtplib
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask_cors import CORS
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 app = Flask(__name__)
+CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
 
 # ----------------------------
-# Konfiguration (am besten via .env)
+# Konfiguration via Umgebungsvariablen
 # ----------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))
@@ -29,7 +31,7 @@ def show_mandat_form():
     return render_template("mandat.html")
 
 # ----------------------------
-# Mail-API für PDF-Versand
+# API: PDF per Mail versenden
 # ----------------------------
 @app.route("/api/sendmail", methods=["POST"])
 def sendmail():
@@ -89,7 +91,7 @@ def custom_static(filename):
     return send_from_directory('static', filename)
 
 # ----------------------------
-# Start für lokalen Test
+# Lokaler Start
 # ----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
