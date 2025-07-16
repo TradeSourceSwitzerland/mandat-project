@@ -424,5 +424,18 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+<!-- Ende Deines Formular‑&‑PDF‑Scripts -->
+
+<!-- Child → Parent: schicke bei Laden & Resize immer die korrekte Höhe -->
+<script>
+  function sendHeight() {
+    parent.postMessage(
+      { type: 'mandatHeight', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  }
+  window.addEventListener('load', sendHeight);
+  window.addEventListener('resize', sendHeight);
+</script>
 </body>
 </html>
