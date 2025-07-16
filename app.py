@@ -105,7 +105,7 @@ TradeSource – Dein Partner für starke Leistungen und den fairsten Preis.
 Freundliche Grüße  
 Dein TradeSource-Team
 
-Telefon: 044 123 45 67  
+Telefon: 043 883 00 07  
 E-Mail: info@tradesource.ch  
 www.tradesource.ch
 """
