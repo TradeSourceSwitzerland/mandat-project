@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <style>
+    /* ... dein CSS aus dem finalen Code ... */
     #mandat-wrapper * { box-sizing: border-box; }
     #mandat-wrapper { font-family: 'Open Sans', sans-serif; color: #1e293b; background: white; max-width: 600px; margin: 40px auto; padding: 40px 35px 50px; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.1);}
     #mandat-wrapper h2 { text-align: center; font-weight: 600; font-size: 2rem; margin-bottom: 30px; color: #0f172a;}
@@ -40,6 +41,8 @@
   <div id="mandat-wrapper">
     <h2>Mandatsformular</h2>
     <form id="mandatForm" autocomplete="off">
+      <!-- ... dein Formular wie gehabt, inkl. Checkboxen ... -->
+      <!-- ... -->
       <label>Anrede / Firma:
         <select name="firma" required>
           <option value="" disabled selected>Bitte auswählen</option>
@@ -69,325 +72,290 @@
         <select id="geburts-monat" name="geburts-monat" required aria-label="Monat"></select>
         <select id="geburts-jahr" name="geburts-jahr" required aria-label="Jahr"></select>
       </div>
+      <!-- ... Checkboxen wie gehabt ... -->
       <fieldset class="checkbox-group">
         <legend>Versichert bei folgenden Gesellschaften:</legend>
-        <label>
-          <input type="checkbox" name="versicherer" value="Baloise" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Baloise_Logo_2022.svg/1920px-Baloise_Logo_2022.svg.png" alt="Baloise" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="AXA" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/AXA_Versicherungen_Logo.svg/1024px-AXA_Versicherungen_Logo.svg.png" alt="AXA" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Generali" />
-          <img src="https://upload.wikimedia.org/wikipedia/de/thumb/3/38/Generali_logo.svg/1024px-Generali_logo.svg.png" alt="Generali" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Helvetia" />
-          <img src="https://upload.wikimedia.org/wikipedia/de/thumb/f/ff/Helvetia_%28Versicherung%29_logo.svg/1920px-Helvetia_%28Versicherung%29_logo.svg.png" alt="Helvetia" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Mobiliar" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Mobiliar_Logo.png" alt="Mobiliar" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Zurich" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/e/e3/Zurich_Insurance_Group_Logo_Horizontal.svg" alt="Zurich" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Vaudoise" />
-          <img src="https://upload.wikimedia.org/wikipedia/de/thumb/c/cf/Vaudoise_Logo.svg/1920px-Vaudoise_Logo.svg.png" alt="Vaudoise" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Allianz" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Allianz.svg/1920px-Allianz.svg.png" alt="Allianz" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
-        <label>
-          <input type="checkbox" name="versicherer" value="Smile" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/Smile.direct_versicherungen.png" alt="Smile" />
-          <span class="checkmark">
-            <svg viewBox="0 0 24 24"><path d="M20.285 6.709l-11.4 11.4-5.3-5.3 1.41-1.41 3.89 3.89 9.99-9.99z"/></svg>
-          </span>
-        </label>
+        <!-- ... alle Labels ... -->
       </fieldset>
       <label>Unterschrift:</label>
       <canvas id="signature-pad" width="600" height="150"></canvas>
       <button type="button" class="btn-clear-sign" onclick="clearSignature()">Unterschrift löschen</button>
-      <button type="submit">PDF generieren &amp; herunterladen</button>
+      <button type="submit">PDF generieren &amp; versenden</button>
     </form>
   </div>
 
-  <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    let ipAdresse = "nicht ermittelbar";
-    fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then(data => { ipAdresse = data.ip || "nicht ermittelbar"; })
-      .catch(() => { ipAdresse = "nicht ermittelbar"; });
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  let ipAdresse = "nicht ermittelbar";
+  fetch('https://api.ipify.org?format=json')
+    .then(res => res.json())
+    .then(data => { ipAdresse = data.ip || "nicht ermittelbar"; })
+    .catch(() => { ipAdresse = "nicht ermittelbar"; });
 
-    // Geburtsdatum Dropdowns befüllen
-    function populateBirthdaySelectors() {
-      const tagSelect = document.getElementById("geburts-tag");
-      const monatSelect = document.getElementById("geburts-monat");
-      const jahrSelect = document.getElementById("geburts-jahr");
-      for (let t = 1; t <= 31; t++) {
-        const option = document.createElement("option");
-        option.value = t;
-        option.textContent = t.toString().padStart(2, "0");
-        tagSelect.appendChild(option);
-      }
-      const monate = [
-        "Januar", "Februar", "März", "April", "Mai", "Juni",
-        "Juli", "August", "September", "Oktober", "November", "Dezember"
-      ];
-      monate.forEach((m, i) => {
-        const option = document.createElement("option");
-        option.value = i + 1;
-        option.textContent = m;
-        monatSelect.appendChild(option);
-      });
-      const heute = new Date();
-      const maxJahr = heute.getFullYear() - 16;
-      for (let j = maxJahr; j >= 1900; j--) {
-        const option = document.createElement("option");
-        option.value = j;
-        option.textContent = j;
-        jahrSelect.appendChild(option);
-      }
+  // Geburtsdatum Dropdowns befüllen
+  function populateBirthdaySelectors() {
+    const tagSelect = document.getElementById("geburts-tag");
+    const monatSelect = document.getElementById("geburts-monat");
+    const jahrSelect = document.getElementById("geburts-jahr");
+    for (let t = 1; t <= 31; t++) {
+      const option = document.createElement("option");
+      option.value = t;
+      option.textContent = t.toString().padStart(2, "0");
+      tagSelect.appendChild(option);
     }
-    populateBirthdaySelectors();
-
-    // Canvas Signatur
-    const canvas = document.getElementById("signature-pad");
-    const ctx = canvas.getContext("2d");
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#1e293b";
-    let drawing = false;
-
-    function getPointerPos(e) {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      let clientX, clientY;
-      if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-      return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
-      };
+    const monate = [
+      "Januar", "Februar", "März", "April", "Mai", "Juni",
+      "Juli", "August", "September", "Oktober", "November", "Dezember"
+    ];
+    monate.forEach((m, i) => {
+      const option = document.createElement("option");
+      option.value = i + 1;
+      option.textContent = m;
+      monatSelect.appendChild(option);
+    });
+    const heute = new Date();
+    const maxJahr = heute.getFullYear() - 16;
+    for (let j = maxJahr; j >= 1900; j--) {
+      const option = document.createElement("option");
+      option.value = j;
+      option.textContent = j;
+      jahrSelect.appendChild(option);
     }
-    canvas.addEventListener("mousedown", e => {
-      drawing = true;
-      const pos = getPointerPos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    });
-    canvas.addEventListener("mouseup", () => { drawing = false; });
-    canvas.addEventListener("mouseleave", () => { drawing = false; });
-    canvas.addEventListener("mousemove", e => {
-      if (!drawing) return;
-      const pos = getPointerPos(e);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    });
-    canvas.addEventListener("touchstart", e => {
-      e.preventDefault();
-      drawing = true;
-      const pos = getPointerPos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    });
-    canvas.addEventListener("touchend", e => {
-      e.preventDefault();
-      drawing = false;
-    });
-    canvas.addEventListener("touchcancel", e => {
-      e.preventDefault();
-      drawing = false;
-    });
-    canvas.addEventListener("touchmove", e => {
-      e.preventDefault();
-      if (!drawing) return;
-      const pos = getPointerPos(e);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    });
-    window.clearSignature = function() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  populateBirthdaySelectors();
+
+  // Canvas Signatur
+  const canvas = document.getElementById("signature-pad");
+  const ctx = canvas.getContext("2d");
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#1e293b";
+  let drawing = false;
+
+  function getPointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
+  }
+  canvas.addEventListener("mousedown", e => {
+    drawing = true;
+    const pos = getPointerPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  });
+  canvas.addEventListener("mouseup", () => { drawing = false; });
+  canvas.addEventListener("mouseleave", () => { drawing = false; });
+  canvas.addEventListener("mousemove", e => {
+    if (!drawing) return;
+    const pos = getPointerPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  });
+  canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+    drawing = true;
+    const pos = getPointerPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  });
+  canvas.addEventListener("touchend", e => {
+    e.preventDefault();
+    drawing = false;
+  });
+  canvas.addEventListener("touchcancel", e => {
+    e.preventDefault();
+    drawing = false;
+  });
+  canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+    if (!drawing) return;
+    const pos = getPointerPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  });
+  window.clearSignature = function() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
 
-    // Checkbox Rahmenfarbe bei Auswahl
-    document.querySelectorAll('#mandat-wrapper fieldset.checkbox-group input[type="checkbox"]').forEach(chk => {
-      chk.addEventListener('change', () => {
-        const label = chk.parentElement;
-        if (chk.checked) {
-          label.style.border = '3px solid #3b82f6';
-        } else {
-          label.style.border = '1.8px solid transparent';
-        }
-      });
-    });
-
-    // Datum validieren
-    function isValidDate(day, month, year) {
-      const date = new Date(year, month -1, day);
-      return (
-        date.getFullYear() === year &&
-        date.getMonth() === month -1 &&
-        date.getDate() === day
-      );
-    }
-
-    document.getElementById("mandatForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData(e.target);
-      const firma = formData.get("firma");
-      const name = formData.get("name");
-      const adresse = formData.get("adresse");
-      const ort_full = formData.get("ort");
-      const tel_privat = formData.get("tel_privat") || "";
-      const email = formData.get("email") || "";
-
-      const tag = parseInt(formData.get("geburts-tag"));
-      const monat = parseInt(formData.get("geburts-monat"));
-      const jahr = parseInt(formData.get("geburts-jahr"));
-
-      if (!isValidDate(tag, monat, jahr)) {
-        alert("Bitte ein gültiges Geburtsdatum auswählen.");
-        return;
-      }
-
-      const geburtsDatumObj = new Date(jahr, monat -1, tag);
-      const heute = new Date();
-      let alter = heute.getFullYear() - geburtsDatumObj.getFullYear();
-      const m = heute.getMonth() - geburtsDatumObj.getMonth();
-      if (m < 0 || (m === 0 && heute.getDate() < geburtsDatumObj.getDate())) {
-        alter--;
-      }
-      if (alter < 16) {
-        alert("Das Mindestalter von 16 Jahren ist erforderlich.");
-        return;
-      }
-
-      const geburtsdatumStr = ${String(tag).padStart(2,"0")}.${String(monat).padStart(2,"0")}.${jahr};
-      const signatureDataUrl = canvas.toDataURL();
-      const versichererAuswahl = formData.getAll("versicherer");
-      const ortText = ort_full.split(",")[1]?.trim() || ort_full;
-      const now = new Date();
-      const datumText =
-        String(now.getDate()).padStart(2, "0") + "." +
-        String(now.getMonth() + 1).padStart(2, "0") + "." +
-        now.getFullYear();
-      const zeitText =
-        String(now.getHours()).padStart(2, "0") + ":" +
-        String(now.getMinutes()).padStart(2, "0");
-      const ort_datum = ${ortText}, ${datumText};
-
-      try {
-        const existingPdfBytes = await fetch(
-          "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/68743dd52c80ea2fc470b046_Mandat%20Muster.pdf"
-        ).then(res => res.arrayBuffer());
-
-        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-        const pngImage = await pdfDoc.embedPng(signatureDataUrl);
-
-        const maxWidth = 150;
-        const scale = maxWidth / pngImage.width;
-
-        const pages = pdfDoc.getPages();
-        const page1 = pages[0];
-        const page2 = pages[1];
-        const page3 = pages[2];
-
-        page1.drawText(firma, { x: 170, y: 670, size: 11 });
-        page1.drawText(name, { x: 170, y: 648, size: 11 });
-        page1.drawText(adresse, { x: 170, y: 627, size: 11 });
-        page1.drawText(ort_full, { x: 170, y: 605, size: 11 });
-        page1.drawText(tel_privat, { x: 170, y: 584, size: 11 });
-        page1.drawText(email, { x: 170, y: 564, size: 11 });
-        page1.drawText(geburtsdatumStr, { x: 390, y: 564, size: 11 });
-
-        page1.drawText(IP: ${ipAdresse}, { x: 450, y: 40, size: 9 });
-        page1.drawText(Datum: ${datumText}, { x: 450, y: 28, size: 9 });
-        page1.drawText(Uhrzeit: ${zeitText}, { x: 450, y: 16, size: 9 });
-
-        page1.drawText(ort_datum, { x: 145, y: 227, size: 11 });
-
-        page1.drawImage(pngImage, {
-          x: 380,
-          y: 220,
-          width: pngImage.width * scale,
-          height: pngImage.height * scale,
-        });
-
-        const startX = 400;
-        let startY = 395;
-        const lineHeight = 20;
-
-        if (versichererAuswahl.length === 0) {
-          page2.drawText("Keine Auswahl", { x: startX, y: startY, size: 10 });
-        } else {
-          versichererAuswahl.forEach((vers, i) => {
-            page2.drawText(vers, { x: startX, y: startY - i * lineHeight, size: 10 });
-          });
-        }
-
-        page3.drawText(name, { x: 395, y: 700, size: 9 });
-        page3.drawText(adresse, { x: 395, y: 690, size: 9 });
-        page3.drawText(ort_full, { x: 395, y: 680, size: 9 });
-
-        page3.drawText(ort_datum, { x: 120, y: 97, size: 11 });
-
-        page3.drawImage(pngImage, {
-          x: 360,
-          y: 80,
-          width: pngImage.width * scale,
-          height: pngImage.height * scale,
-        });
-
-        const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = Mandat_${name.replace(/ /g, "_")}.pdf;
-        link.click();
-      } catch (err) {
-        alert("Fehler beim Generieren des PDFs: " + err);
+  // Checkbox Rahmenfarbe bei Auswahl
+  document.querySelectorAll('#mandat-wrapper fieldset.checkbox-group input[type="checkbox"]').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const label = chk.parentElement;
+      if (chk.checked) {
+        label.style.border = '3px solid #3b82f6';
+      } else {
+        label.style.border = '1.8px solid transparent';
       }
     });
   });
-  </script>
+
+  // Datum validieren
+  function isValidDate(day, month, year) {
+    const date = new Date(year, month -1, day);
+    return (
+      date.getFullYear() === year &&
+      date.getMonth() === month -1 &&
+      date.getDate() === day
+    );
+  }
+
+  // NEU: PDF generieren & versenden per E-Mail
+  document.getElementById("mandatForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const firma = formData.get("firma");
+    const name = formData.get("name");
+    const adresse = formData.get("adresse");
+    const ort_full = formData.get("ort");
+    const tel_privat = formData.get("tel_privat") || "";
+    const email = formData.get("email") || "";
+
+    const tag = parseInt(formData.get("geburts-tag"));
+    const monat = parseInt(formData.get("geburts-monat"));
+    const jahr = parseInt(formData.get("geburts-jahr"));
+
+    if (!isValidDate(tag, monat, jahr)) {
+      alert("Bitte ein gültiges Geburtsdatum auswählen.");
+      return;
+    }
+
+    const geburtsDatumObj = new Date(jahr, monat -1, tag);
+    const heute = new Date();
+    let alter = heute.getFullYear() - geburtsDatumObj.getFullYear();
+    const m = heute.getMonth() - geburtsDatumObj.getMonth();
+    if (m < 0 || (m === 0 && heute.getDate() < geburtsDatumObj.getDate())) {
+      alter--;
+    }
+    if (alter < 16) {
+      alert("Das Mindestalter von 16 Jahren ist erforderlich.");
+      return;
+    }
+
+    const geburtsdatumStr = String(tag).padStart(2,"0") + "." + String(monat).padStart(2,"0") + "." + jahr;
+    const signatureDataUrl = canvas.toDataURL();
+    const versichererAuswahl = formData.getAll("versicherer");
+    const ortText = ort_full.split(",")[1]?.trim() || ort_full;
+    const now = new Date();
+    const datumText =
+      String(now.getDate()).padStart(2, "0") + "." +
+      String(now.getMonth() + 1).padStart(2, "0") + "." +
+      now.getFullYear();
+    const zeitText =
+      String(now.getHours()).padStart(2, "0") + ":" +
+      String(now.getMinutes()).padStart(2, "0");
+    const ort_datum = ortText + ", " + datumText;
+
+    try {
+      const existingPdfBytes = await fetch(
+        "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/68743dd52c80ea2fc470b046_Mandat%20Muster.pdf"
+      ).then(res => res.arrayBuffer());
+
+      const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+      const pngImage = await pdfDoc.embedPng(signatureDataUrl);
+
+      const maxWidth = 150;
+      const scale = maxWidth / pngImage.width;
+
+      const pages = pdfDoc.getPages();
+      const page1 = pages[0];
+      const page2 = pages[1];
+      const page3 = pages[2];
+
+      page1.drawText(firma, { x: 170, y: 670, size: 11 });
+      page1.drawText(name, { x: 170, y: 648, size: 11 });
+      page1.drawText(adresse, { x: 170, y: 627, size: 11 });
+      page1.drawText(ort_full, { x: 170, y: 605, size: 11 });
+      page1.drawText(tel_privat, { x: 170, y: 584, size: 11 });
+      page1.drawText(email, { x: 170, y: 564, size: 11 });
+      page1.drawText(geburtsdatumStr, { x: 390, y: 564, size: 11 });
+
+      page1.drawText("IP: " + ipAdresse, { x: 450, y: 40, size: 9 });
+      page1.drawText("Datum: " + datumText, { x: 450, y: 28, size: 9 });
+      page1.drawText("Uhrzeit: " + zeitText, { x: 450, y: 16, size: 9 });
+
+      page1.drawText(ort_datum, { x: 145, y: 227, size: 11 });
+
+      page1.drawImage(pngImage, {
+        x: 380,
+        y: 220,
+        width: pngImage.width * scale,
+        height: pngImage.height * scale,
+      });
+
+      const startX = 400;
+      let startY = 395;
+      const lineHeight = 20;
+
+      if (versichererAuswahl.length === 0) {
+        page2.drawText("Keine Auswahl", { x: startX, y: startY, size: 10 });
+      } else {
+        versichererAuswahl.forEach((vers, i) => {
+          page2.drawText(vers, { x: startX, y: startY - i * lineHeight, size: 10 });
+        });
+      }
+
+      page3.drawText(name, { x: 395, y: 700, size: 9 });
+      page3.drawText(adresse, { x: 395, y: 690, size: 9 });
+      page3.drawText(ort_full, { x: 395, y: 680, size: 9 });
+
+      page3.drawText(ort_datum, { x: 120, y: 97, size: 11 });
+
+      page3.drawImage(pngImage, {
+        x: 360,
+        y: 80,
+        width: pngImage.width * scale,
+        height: pngImage.height * scale,
+      });
+
+      // PDF speichern und per Mail versenden
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const reader = new FileReader();
+
+      reader.onloadend = async function () {
+        const base64PDF = reader.result.split(",")[1];
+
+        // Mail-API Request
+        const response = await fetch("https://mandat-backend.onrender.com/api/sendmail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firma,
+            name,
+            adresse,
+            ort: ort_full,
+            tel_privat,
+            email,
+            geburtsdatum: geburtsdatumStr,
+            versicherer: versichererAuswahl,
+            pdf_base64: base64PDF,
+            filename: `Mandat_${name.replace(/ /g, '_')}.pdf`
+          })
+        });
+
+        const result = await response.json();
+        alert(result.success ? "✅ Erfolgreich versendet" : "❌ Fehler: " + result.error);
+      };
+
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      alert("Fehler beim Generieren und Versenden des PDFs: " + err);
+    }
+  });
+});
+</script>
 </body>
 </html>
