@@ -145,7 +145,7 @@
   </label>
 </fieldset>
       <label>Unterschrift:</label>
-      <canvas id="signature-pad" height="150"></canvas>
+      <canvas id="signature-pad" width="600" height="150"></canvas>
       <button type="button" class="btn-clear-sign" onclick="clearSignature()">Unterschrift löschen</button>
       <button type="submit">PDF generieren &amp; versenden</button>
     </form>
@@ -198,18 +198,6 @@ document.addEventListener('DOMContentLoaded', function() {
   ctx.lineCap     = "round";
   ctx.strokeStyle = "#1e293b";
   let drawing      = false;
-
-  // Funktion, die die Canvas-Pixelgröße dem CSS-Layout anpasst
-  function resizeCanvas() {
-    // passt interne Pixelgröße an die gerenderte Breite an
-    canvas.width  = canvas.offsetWidth;
-    canvas.height = 160;
-
-    // Zeichen‑Settings nach Resize wiederherstellen
-    ctx.lineWidth   = 2;
-    ctx.lineCap     = "round";
-    ctx.strokeStyle = "#1e293b";
-  }
 
   function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
