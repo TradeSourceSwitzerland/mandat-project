@@ -211,10 +211,6 @@ document.addEventListener('DOMContentLoaded', function() {
     ctx.strokeStyle = "#1e293b";
   }
 
-  // Einmal beim Laden und bei jeder Fenster-Größenänderung
-  window.addEventListener('load',  resizeCanvas);
-  window.addEventListener('resize', resizeCanvas);
-
   function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
