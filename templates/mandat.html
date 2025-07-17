@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
       const pngImage = await pdfDoc.embedPng(signatureDataUrl);
 
-      const maxWidth = 150;
+      const maxWidth = 120;
       const scale = maxWidth / pngImage.width;
 
       const pages = pdfDoc.getPages();
