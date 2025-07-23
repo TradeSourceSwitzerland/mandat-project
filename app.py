@@ -10,7 +10,12 @@ from email.mime.application import MIMEApplication
 
 app = Flask(__name__)
 CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
-
+# ----------------------------
+# Health‑Check für Wake‑Up Pings
+# ----------------------------
+@app.route("/healthz", methods=["HEAD"])
+def healthz():
+    return "", 200
 # ----------------------------
 # Konfiguration via Umgebungsvariablen
 # ----------------------------
