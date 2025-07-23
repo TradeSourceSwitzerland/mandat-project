@@ -13,7 +13,7 @@ CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
 # ----------------------------
 # Health‑Check für Wake‑Up Pings
 # ----------------------------
-@app.route("/healthz", methods=["HEAD"])
+@app.route("/healthz", methods=["GET"])
 def healthz():
     return "", 200
 # ----------------------------
