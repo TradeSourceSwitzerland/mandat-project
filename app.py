@@ -108,7 +108,7 @@ Nächste Schritte:
 
 Wichtige Hinweise:
 • Pro Mandat und Kalenderjahr erhältst Du eine pyhische Autobahn-Vignette
-• Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource
+• Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource Switzerland GmbH
 • Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
 
 Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
