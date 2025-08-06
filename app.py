@@ -118,7 +118,7 @@ Mit freundlichen Grüssen
 Ihr TradeSource-Team
 
 FINMA Nr.: F01452693
-Direct: 043 883 00 07
+Direct: +41 43 883 00 07
 E-Mail: info@tradesource.ch
 Web: www.tradesource.ch
 
