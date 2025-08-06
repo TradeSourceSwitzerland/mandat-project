@@ -95,24 +95,28 @@ E-Mail: {email}
             kunden_msg["To"] = email
 
             kunden_text = f"""\
-Hallo {name},
+Hallo {Name},
 
-Herzlichen Dank für Dein Vertrauen und Deine Mandatsanfrage bei TradeSource!
+Vielen Dank für Dein Vertrauen – Dein Mandat wurde erfolgreich an die Versicherung weitergeleitet.
 
-Wir freuen uns sehr, dass Du Dich für unseren kostenlosen Service entschieden hast. So profitierst Du nicht nur von den günstigsten Versicherungspreisen – sondern auch von einer völlig unverbindlichen und transparenten Beratung.
+Nächste Schritte:
+- Prüfung Deines Mandats durch die Versicherung
+- Bei positiver Rückmeldung automatische Aufnahme in unsere Vignetten-Aktion
+- Versand Deiner klassischen Autobahn-Vignette im Januar per Post
 
-Unser Versprechen: Du erhältst garantiert die besten Konditionen am Markt, ohne versteckte Kosten. Lehn Dich entspannt zurück – wir kümmern uns um den Rest!
+Wichtige Hinweise:
+- Pro Mandat und Kalenderjahr erhältst Du eine pyhische Autobahn-Vignette
+- Voraussetzung ist ein aktives Mandats- und Versicherungsverhältnis via TradeSource
+- Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
 
-Wenn Du Fragen oder Wünsche hast, sind wir jederzeit persönlich für Dich da.
+Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung:
+Telefon: 043 883 00 07
+E-Mail: info@tradesource.ch
+Web: www.tradesource.ch
 
-TradeSource – Dein Partner für starke Leistungen und den fairsten Preis.
-
-Freundliche Grüße  
-Dein TradeSource-Team
-
-Telefon: 043 883 00 07  
-E-Mail: info@tradesource.ch  
-www.tradesource.ch
+Mit freundlichen Grüssen
+Ihr TradeSource-Team
+Transparenz | Fairness | Sicherheit
 """
 
             kunden_msg.attach(MIMEText(kunden_text, "plain"))
