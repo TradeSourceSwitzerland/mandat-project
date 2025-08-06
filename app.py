@@ -115,7 +115,7 @@ Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
 Mit freundlichen Grüssen
 
-Ihr TradeSource-Team
+Dein TradeSource-Team
 
 FINMA Nr.: F01452693
 Direct: +41 43 883 00 07
