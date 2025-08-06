@@ -95,7 +95,7 @@ E-Mail: {email}
             kunden_msg["To"] = email
 
             kunden_text = f"""\
-Hallo {Name},
+Hallo {name},
 
 Vielen Dank für Dein Vertrauen – Dein Mandat wurde erfolgreich an die Versicherung weitergeleitet.
 
