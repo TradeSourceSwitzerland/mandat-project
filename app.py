@@ -97,25 +97,31 @@ E-Mail: {email}
             kunden_text = f"""\
 Hallo {name},
 
-Vielen Dank für Dein Vertrauen – Dein Mandat wurde erfolgreich an die Versicherung weitergeleitet.
+Vielen Dank für Dein Vertrauen!
+
+Dein Mandat wurde erfolgreich an die Versicherung weitergeleitet.
 
 Nächste Schritte:
-- Prüfung Deines Mandats durch die Versicherung
-- Bei positiver Rückmeldung automatische Aufnahme in unsere Vignetten-Aktion
-- Versand Deiner klassischen Autobahn-Vignette im Januar per Post
+• Prüfung Deines Mandats durch die Versicherung
+• Bei positiver Rückmeldung automatische Aufnahme in unsere Vignetten-Aktion
+• Versand Deiner klassischen Autobahn-Vignette im Januar per Post
 
 Wichtige Hinweise:
-- Pro Mandat und Kalenderjahr erhältst Du eine pyhische Autobahn-Vignette
-- Voraussetzung ist ein aktives Mandats- und Versicherungsverhältnis via TradeSource
-- Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
+• Pro Mandat und Kalenderjahr erhältst Du eine pyhische Autobahn-Vignette
+• Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource
+• Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
 
-Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung:
-Telefon: 043 883 00 07
+Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
+
+Mit freundlichen Grüssen
+
+Ihr TradeSource-Team
+
+FINMA Nr.: F01452693
+Direct: 043 883 00 07
 E-Mail: info@tradesource.ch
 Web: www.tradesource.ch
 
-Mit freundlichen Grüssen
-Ihr TradeSource-Team
 Transparenz | Fairness | Sicherheit
 """
 
