@@ -59,7 +59,7 @@ E-Mail: {email}
 """
 
         msg = MIMEMultipart()
-        msg["Subject"] = "Neue Mandatsformular Anfrage"
+        msg["Subject"] = "{name}, Neue Mandatsformular Anfrage"
         msg["From"] = EMAIL_HOST_USER
         msg["To"] = EMAIL_TO
         msg.attach(MIMEText(mailtext, "plain"))
@@ -90,7 +90,7 @@ E-Mail: {email}
         # --------
         if email:
             kunden_msg = MIMEMultipart()
-            kunden_msg["Subject"] = "Deine Mandatsanfrage bei TradeSource"
+            kunden_msg["Subject"] = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
 
@@ -99,7 +99,7 @@ Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
 
-Dein Mandat wurde erfolgreich an die Versicherung weitergeleitet.
+Dein Mandat wurde erfolgreich an Deine Versicherung weitergeleitet.
 
 Nächste Schritte:
 • Prüfung Deines Mandats durch die Versicherung
