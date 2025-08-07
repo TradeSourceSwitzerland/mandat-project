@@ -59,7 +59,7 @@ E-Mail: {email}
 """
 
         msg = MIMEMultipart()
-        msg["Subject"] = "{name}, Neue Mandatsformular Anfrage"
+        msg["Subject"] = f"{name}, Neue Mandatsformular Anfrage"
         msg["From"] = EMAIL_HOST_USER
         msg["To"] = EMAIL_TO
         msg.attach(MIMEText(mailtext, "plain"))
