@@ -111,7 +111,7 @@ Wichtige Hinweise:
 • Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource Switzerland GmbH
 • Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
 
-Lass Dir von Deinem alten Berater nichts einreden. Falls er Dich anruft, kontaktiere uns umgehend – wir schützen Dich vor unzulässigen oder manipulativen Gesprächen. Unser Premium Service ist schweizweit zertifiziert und für Dich garantiert kostenlos, denn wir setzen uns mit voller Kraft für Deine Interessen ein.
+Lass Dich von Deinem bisherigen Berater nicht verunsichern. Falls er Dich kontaktiert, melde Dich umgehend bei uns – wir schützen Dich vor unzulässigen oder manipulativen Gesprächsversuchen. Unser Premium-Service ist schweizweit zertifiziert und für Dich garantiert kostenlos. Wir setzen uns mit voller Sorgfalt und ganzer Kraft für Deine Interessen ein.
 
 Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
