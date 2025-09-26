@@ -27,6 +27,8 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))  # nur STARTTLS
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
+SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "20"))  # Sekunden
+EMAIL_DEBUG  = os.getenv("EMAIL_DEBUG", "0") == "1"
 
 if not EMAIL_HOST_PASSWORD:
     raise RuntimeError("EMAIL_HOST_PASSWORD is not set. Please set the environment variable.")
@@ -35,39 +37,35 @@ if not EMAIL_HOST_PASSWORD:
 # Helper: Mail per STARTTLS (587) mit IPv4-Fallback
 # ----------------------------
 def send_via_starttls(msg):
-    """
-    Versucht zuerst normale Auflösung (kann bei Render IPv6 wählen).
-    Falls Verbindungs-/Timeout-Fehler: erzwungener IPv4-Verbindungsaufbau.
-    """
     ctx = ssl.create_default_context()
 
     def _send(open_smtp):
         with open_smtp() as server:
+            if EMAIL_DEBUG:
+                server.set_debuglevel(1)  # SMTP-Handshake in Logs
             server.ehlo()
             server.starttls(context=ctx)
             server.ehlo()
             server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
             server.sendmail(EMAIL_HOST_USER, [msg["To"]], msg.as_string())
 
-    # 1) Standardweg
+    # 1) Standardweg (kann IPv6 erwischen)
     try:
-        return _send(lambda: smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=20))
+        return _send(lambda: smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=SMTP_TIMEOUT))
     except (smtplib.SMTPConnectError,
             smtplib.SMTPServerDisconnected,
             TimeoutError, socket.timeout, OSError) as e_std:
         # 2) IPv4-Fallback
         try:
             a_records = socket.getaddrinfo(EMAIL_HOST, EMAIL_PORT, socket.AF_INET, socket.SOCK_STREAM)
-            ipv4 = a_records[0][4][0]  # erste IPv4-Adresse
+            ipv4 = a_records[0][4][0]
             def open_ipv4():
-                s = smtplib.SMTP(timeout=20)
+                s = smtplib.SMTP(timeout=SMTP_TIMEOUT)  # <- hier auch den ENV-Timeout nutzen
                 s.connect(ipv4, EMAIL_PORT)
-                # wichtig für SNI/Hostname-Check bei STARTTLS:
-                s._host = EMAIL_HOST
+                s._host = EMAIL_HOST  # wichtig für STARTTLS/SNI
                 return s
             return _send(open_ipv4)
         except Exception as e_v4:
-            # ursprünglichen Fehler priorisieren
             raise e_std from e_v4
 
 # ----------------------------
