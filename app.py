@@ -24,19 +24,17 @@ def healthz():
 # Konfiguration via ENV
 # ----------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
-EMAIL_PORT = os.getenv("EMAIL_PORT")  # optional; wenn None => AUTO
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))          # Default 465
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
-EMAIL_SMTP_MODE = os.getenv("EMAIL_SMTP_MODE", "AUTO").upper()  # AUTO | STARTTLS | SSL
-SMTP_TIMEOUT = float(os.getenv("SMTP_TIMEOUT", "12"))
-EMAIL_DEBUG = os.getenv("EMAIL_DEBUG", "0") == "1"
+EMAIL_SMTP_MODE = os.getenv("EMAIL_SMTP_MODE", "SSL").upper()  # Default SSL
 
 if not EMAIL_HOST_PASSWORD:
     raise RuntimeError("EMAIL_HOST_PASSWORD is not set.")
 
 # ----------------------------
-# Utility: robustes Senden (STARTTLS/SSL Fallback)
+# Utility: Senden (SSL/STARTTLS)
 # ----------------------------
 def _send_via_starttls(msg_str: str, to_addr: str, port: int = 587):
     context = ssl.create_default_context()
@@ -59,38 +57,31 @@ def _send_via_ssl(msg_str: str, to_addr: str, port: int = 465):
 
 def send_mail_with_fallback(msg_str: str, to_addr: str):
     """
-    Versucht in dieser Reihenfolge:
-    - Wenn EMAIL_PORT gesetzt: nutzt gewählten Modus (EMAIL_SMTP_MODE) ODER leitet Port→Modus ab.
-    - Sonst AUTO: STARTTLS@587, dann SSL@465
+    Standard: SSL@EMAIL_PORT (Default 465).
+    STARTTLS@587 nur, wenn EMAIL_SMTP_MODE=STARTTLS.
+    AUTO: erst SSL@465, dann STARTTLS@587.
     """
+    try_order = []
+
+    if EMAIL_SMTP_MODE == "SSL":
+        try_order = [("SSL", EMAIL_PORT or 465)]
+    elif EMAIL_SMTP_MODE == "STARTTLS":
+        try_order = [("STARTTLS", EMAIL_PORT or 587)]
+    else:  # AUTO
+        try_order = [("SSL", 465), ("STARTTLS", 587)]
+
     errors = []
-
-    # Reihenfolge der Versuche bestimmen
-    attempts = []
-    if EMAIL_PORT:
-        port = int(EMAIL_PORT)
-        mode = EMAIL_SMTP_MODE
-        if mode == "AUTO":
-            mode = "STARTTLS" if port == 587 else "SSL" if port == 465 else "STARTTLS"
-        attempts = [(mode, port)]
-    else:
-        if EMAIL_SMTP_MODE == "STARTTLS":
-            attempts = [("STARTTLS", 587)]
-        elif EMAIL_SMTP_MODE == "SSL":
-            attempts = [("SSL", 465)]
-        else:
-            attempts = [("STARTTLS", 587), ("SSL", 465)]
-
-    for mode, port in attempts:
+    for mode, port in try_order:
         try:
             if mode == "STARTTLS":
-                _send_via_starttls(msg_str, to_addr, port)
+                _send_via_starttls(msg_str, to_addr, int(port))
             else:
-                _send_via_ssl(msg_str, to_addr, port)
+                _send_via_ssl(msg_str, to_addr, int(port))
             return True, None
         except smtplib.SMTPAuthenticationError as e:
             return False, f"SMTP Auth fehlgeschlagen: {e}"
-        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, socket.timeout, OSError, smtplib.SMTPException) as e:
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected,
+                socket.timeout, OSError, smtplib.SMTPException) as e:
             errors.append(f"{mode}@{EMAIL_HOST}:{port} -> {e}")
 
     return False, "; ".join(errors) if errors else "Unbekannter SMTP-Fehler"
