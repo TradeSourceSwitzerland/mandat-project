@@ -2,6 +2,7 @@ import os
 import ssl
 import base64
 import smtplib
+import socket
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from email.mime.text import MIMEText
@@ -22,7 +23,7 @@ def healthz():
 # Konfiguration via ENV
 # ----------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))  # STARTTLS-Standard
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))  # nur STARTTLS
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
@@ -31,16 +32,43 @@ if not EMAIL_HOST_PASSWORD:
     raise RuntimeError("EMAIL_HOST_PASSWORD is not set. Please set the environment variable.")
 
 # ----------------------------
-# Helper: Mail per STARTTLS senden (Port 587)
+# Helper: Mail per STARTTLS (587) mit IPv4-Fallback
 # ----------------------------
 def send_via_starttls(msg):
-    context = ssl.create_default_context()
-    with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=20) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.ehlo()
-        server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
-        server.sendmail(EMAIL_HOST_USER, [msg["To"]], msg.as_string())
+    """
+    Versucht zuerst normale Auflösung (kann bei Render IPv6 wählen).
+    Falls Verbindungs-/Timeout-Fehler: erzwungener IPv4-Verbindungsaufbau.
+    """
+    ctx = ssl.create_default_context()
+
+    def _send(open_smtp):
+        with open_smtp() as server:
+            server.ehlo()
+            server.starttls(context=ctx)
+            server.ehlo()
+            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+            server.sendmail(EMAIL_HOST_USER, [msg["To"]], msg.as_string())
+
+    # 1) Standardweg
+    try:
+        return _send(lambda: smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=20))
+    except (smtplib.SMTPConnectError,
+            smtplib.SMTPServerDisconnected,
+            TimeoutError, socket.timeout, OSError) as e_std:
+        # 2) IPv4-Fallback
+        try:
+            a_records = socket.getaddrinfo(EMAIL_HOST, EMAIL_PORT, socket.AF_INET, socket.SOCK_STREAM)
+            ipv4 = a_records[0][4][0]  # erste IPv4-Adresse
+            def open_ipv4():
+                s = smtplib.SMTP(timeout=20)
+                s.connect(ipv4, EMAIL_PORT)
+                # wichtig für SNI/Hostname-Check bei STARTTLS:
+                s._host = EMAIL_HOST
+                return s
+            return _send(open_ipv4)
+        except Exception as e_v4:
+            # ursprünglichen Fehler priorisieren
+            raise e_std from e_v4
 
 # ----------------------------
 # HTML-Formular (optional)
@@ -69,14 +97,13 @@ def sendmail():
         pdf_base64 = data.get("pdf_base64")
         filename = (data.get("filename") or "mandat.pdf").replace("/", "_").replace("\\", "_")
 
-        # --- Admin-Mail zusammenbauen ---
+        # --- Admin-Mail ---
         mailtext = f"""Neue Mandatsanfrage:
 
 Name: {name}
 Geburtsdatum: {geburtsdatum}
 E-Mail: {email}
 """
-
         admin_msg = MIMEMultipart()
         admin_msg["Subject"] = f"{name or 'Unbekannt'}, Neue Mandatsformular Anfrage"
         admin_msg["From"] = EMAIL_HOST_USER
@@ -96,7 +123,7 @@ E-Mail: {email}
             except Exception as e:
                 return jsonify({"success": False, "error": f"PDF Decode Fehler: {e}"}), 400
 
-        # --- Senden an Admin ---
+        # senden
         send_via_starttls(admin_msg)
 
         # --- Kundenbestätigung (optional) ---
@@ -131,7 +158,6 @@ Web: www.tradesource.ch
 
 Transparenz | Fairness | Sicherheit
 """
-
             kunden_msg = MIMEMultipart()
             kunden_msg["Subject"] = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
@@ -149,7 +175,7 @@ Transparenz | Fairness | Sicherheit
 
     except smtplib.SMTPAuthenticationError as e:
         return jsonify({"success": False, "error": f"SMTP Auth fehlgeschlagen: {e}"}), 502
-    except (smtplib.SMTPException, OSError) as e:
+    except (smtplib.SMTPException, OSError, TimeoutError, socket.timeout) as e:
         return jsonify({"success": False, "error": f"SMTP Fehler: {e}"}), 502
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
