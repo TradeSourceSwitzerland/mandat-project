@@ -99,7 +99,7 @@ Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
 
-Dein Mandat wurde erfolgreich an Deine Versicherung weitergeleitet.
+Deine Anfrage wurde erfolgreich an Deine Versicherung weitergeleitet.
 
 Nächste Schritte:
 • Prüfung Deines Mandats durch die Versicherung
@@ -110,8 +110,6 @@ Wichtige Hinweise:
 • Pro Mandat und Kalenderjahr erhältst Du eine physische Autobahn-Vignette
 • Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource Switzerland GmbH
 • Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
-
-Unser Premium-Service ist schweizweit zertifiziert und für Dich garantiert kostenlos. Mit voller Sorgfalt und höchstem Engagement vertreten wir Deine Interessen. Lass Dich daher nicht verunsichern, falls Dein bisheriger Berater versucht, Dich zurückzugewinnen – wir stehen klar, unabhängig und ausschliesslich auf Deiner Seite.
 
 Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
