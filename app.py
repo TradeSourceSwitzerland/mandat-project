@@ -9,17 +9,13 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 app = Flask(__name__)
-
-# 🔧 CORS sauber konfigurieren (alle Origins für /api/*)
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
-
+CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
 # ----------------------------
-# Health-Check (GET + HEAD)  ✅
+# Health‑Check für Wake‑Up Pings
 # ----------------------------
-@app.route("/healthz", methods=["GET", "HEAD"])
+@app.route("/healthz", methods=["GET"])
 def healthz():
     return "", 200
-
 # ----------------------------
 # Konfiguration via Umgebungsvariablen
 # ----------------------------
@@ -42,27 +38,20 @@ def show_mandat_form():
 # ----------------------------
 # API: PDF per Mail versenden
 # ----------------------------
-@app.route("/api/sendmail", methods=["POST", "OPTIONS"])  # ✅ OPTIONS erlaubt (Preflight)
+@app.route("/api/sendmail", methods=["POST"])
 def sendmail():
-    # ✅ Preflight sofort 200 mit CORS-Headern (setzt Flask-CORS)
-    if request.method == "OPTIONS":
-        return "", 200
-
     try:
-        # defensive: nur JSON akzeptieren
-        if not request.is_json:
-            return jsonify({"success": False, "error": "Content-Type muss application/json sein."}), 400
-
-        data = request.get_json()
+        data = request.json
         print("POST /api/sendmail empfangen:", data)
 
         name = data.get("name", "")
         email = data.get("email", "")
         geburtsdatum = data.get("geburtsdatum", "")
-        pdf_base64 = data.get("pdf_base64")
-        filename = (data.get("filename") or "mandat.pdf").replace("/", "_").replace("\\", "_")
+        pdf_base64 = data.get("pdf_base64", None)
+        filename = data.get("filename", "mandat.pdf")
 
-        mailtext = f"""Neue Mandatsanfrage:
+        mailtext = f"""
+Neue Mandatsanfrage:
 
 Name: {name}
 Geburtsdatum: {geburtsdatum}
@@ -78,10 +67,7 @@ E-Mail: {email}
         pdf_bytes = None
         if pdf_base64:
             try:
-                # Falls jemand doch eine Data-URL schickt, abtrennen:
-                if "," in pdf_base64:
-                    pdf_base64 = pdf_base64.split(",", 1)[1]
-                pdf_bytes = base64.b64decode(pdf_base64, validate=True)
+                pdf_bytes = base64.b64decode(pdf_base64)
                 part = MIMEApplication(pdf_bytes, Name=filename)
                 part['Content-Disposition'] = f'attachment; filename="{filename}"'
                 msg.attach(part)
@@ -92,22 +78,24 @@ E-Mail: {email}
             print("Warnung: Kein PDF im Request enthalten.")
 
         context = ssl.create_default_context()
-
-        # Admin-Mail
+        # Sende interne Mail an Admin
         with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
             server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
             server.sendmail(EMAIL_HOST_USER, EMAIL_TO, msg.as_string())
 
         print("E-Mail an Admin erfolgreich gesendet ✅")
 
-        # Kunden-Bestätigung (nur wenn E-Mail vorhanden)
+        # --------
+        # Sende Bestätigungsmail an den Kunden
+        # --------
         if email:
             kunden_msg = MIMEMultipart()
             kunden_msg["Subject"] = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
 
-            kunden_text = f"""Hallo {name},
+            kunden_text = f"""\
+Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
 
@@ -128,6 +116,7 @@ Unser Premium-Service ist schweizweit zertifiziert und für Dich garantiert kost
 Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
 Mit freundlichen Grüssen
+
 Dein TradeSource-Team
 
 FINMA Nr.: F01452693
@@ -137,8 +126,10 @@ Web: www.tradesource.ch
 
 Transparenz | Fairness | Sicherheit
 """
+
             kunden_msg.attach(MIMEText(kunden_text, "plain"))
 
+            # Optional: PDF auch an den Kunden anhängen
             if pdf_bytes:
                 part = MIMEApplication(pdf_bytes, Name=filename)
                 part['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -156,7 +147,6 @@ Transparenz | Fairness | Sicherheit
 
     except Exception as e:
         print("Fehler in /api/sendmail:", str(e))
-        # Wichtig: JSON zurückgeben, damit `response.json()` im Frontend nicht crasht
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ----------------------------
