@@ -2,6 +2,7 @@ import os
 import ssl
 import base64
 import smtplib
+import socket
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from email.mime.text import MIMEText
@@ -9,24 +10,92 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 app = Flask(__name__)
-CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
+# CORS für /api/* erlauben, inkl. Preflight
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
+
 # ----------------------------
-# Health‑Check für Wake‑Up Pings
+# Health-Check
 # ----------------------------
-@app.route("/healthz", methods=["GET"])
+@app.route("/healthz", methods=["GET", "HEAD"])
 def healthz():
     return "", 200
+
 # ----------------------------
-# Konfiguration via Umgebungsvariablen
+# Konfiguration via ENV
 # ----------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))
+EMAIL_PORT = os.getenv("EMAIL_PORT")  # optional; wenn None => AUTO
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
+EMAIL_SMTP_MODE = os.getenv("EMAIL_SMTP_MODE", "AUTO").upper()  # AUTO | STARTTLS | SSL
+SMTP_TIMEOUT = float(os.getenv("SMTP_TIMEOUT", "12"))
+EMAIL_DEBUG = os.getenv("EMAIL_DEBUG", "0") == "1"
 
 if not EMAIL_HOST_PASSWORD:
-    raise RuntimeError("EMAIL_HOST_PASSWORD is not set. Please set the environment variable.")
+    raise RuntimeError("EMAIL_HOST_PASSWORD is not set.")
+
+# ----------------------------
+# Utility: robustes Senden (STARTTLS/SSL Fallback)
+# ----------------------------
+def _send_via_starttls(msg_str, to_addr):
+    context = ssl.create_default_context()
+    with smtplib.SMTP(EMAIL_HOST, int(os.getenv("EMAIL_PORT", 587)), timeout=SMTP_TIMEOUT) as server:
+        if EMAIL_DEBUG:
+            server.set_debuglevel(1)
+        server.ehlo()
+        server.starttls(context=context)
+        server.ehlo()
+        server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+        server.sendmail(EMAIL_HOST_USER, to_addr, msg_str)
+
+def _send_via_ssl(msg_str, to_addr):
+    context = ssl.create_default_context()
+    port = int(os.getenv("EMAIL_PORT", 465))
+    with smtplib.SMTP_SSL(EMAIL_HOST, port, context=context, timeout=SMTP_TIMEOUT) as server:
+        if EMAIL_DEBUG:
+            server.set_debuglevel(1)
+        server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+        server.sendmail(EMAIL_HOST_USER, to_addr, msg_str)
+
+def send_mail_with_fallback(msg_str, to_addr):
+    """
+    Versucht in dieser Reihenfolge:
+    - Wenn EMAIL_PORT gesetzt: nutzt gewählten Modus (EMAIL_SMTP_MODE) ODER leitet Port→Modus ab.
+    - Sonst AUTO: STARTTLS:587, dann SSL:465
+    """
+    errors = []
+
+    # Bestimme Reihenfolge der Versuche
+    attempts = []
+    if EMAIL_PORT:
+        port = int(EMAIL_PORT)
+        # Port -> Modus ableiten falls AUTO
+        mode = EMAIL_SMTP_MODE
+        if mode == "AUTO":
+            mode = "STARTTLS" if port == 587 else "SSL" if port == 465 else "STARTTLS"
+        attempts = [(mode, port)]
+    else:
+        if EMAIL_SMTP_MODE == "STARTTLS":
+            attempts = [("STARTTLS", 587)]
+        elif EMAIL_SMTP_MODE == "SSL":
+            attempts = [("SSL", 465)]
+        else:
+            attempts = [("STARTTLS", 587), ("SSL", 465)]
+
+    for mode, port in attempts:
+        try:
+            if mode == "STARTTLS":
+                _send_via_starttls(msg_str, to_addr)
+            else:
+                _send_via_ssl(msg_str, to_addr)
+            return True, None
+        except (smtplib.SMTPAuthenticationError) as e:
+            return False, f"SMTP Auth fehlgeschlagen: {e}"
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, socket.timeout, OSError, smtplib.SMTPException) as e:
+            errors.append(f"{mode}@{EMAIL_HOST}:{port} -> {e}")
+
+    return False, "; ".join(errors) if errors else "Unbekannter SMTP-Fehler"
 
 # ----------------------------
 # HTML-Formular anzeigen
@@ -38,64 +107,70 @@ def show_mandat_form():
 # ----------------------------
 # API: PDF per Mail versenden
 # ----------------------------
-@app.route("/api/sendmail", methods=["POST"])
+@app.route("/api/sendmail", methods=["POST", "OPTIONS"])
 def sendmail():
+    # Preflight
+    if request.method == "OPTIONS":
+        return "", 200
+
     try:
-        data = request.json
-        print("POST /api/sendmail empfangen:", data)
+        if not request.is_json:
+            return jsonify({"success": False, "error": "Content-Type muss application/json sein."}), 400
 
-        name = data.get("name", "")
-        email = data.get("email", "")
-        geburtsdatum = data.get("geburtsdatum", "")
-        pdf_base64 = data.get("pdf_base64", None)
-        filename = data.get("filename", "mandat.pdf")
+        data = request.get_json(force=True, silent=True) or {}
+        print("POST /api/sendmail empfangen:", {k: (v[:50] + "...") if isinstance(v, str) and len(v) > 60 else v for k,v in data.items()})
 
-        mailtext = f"""
-Neue Mandatsanfrage:
+        name = data.get("name", "").strip()
+        email = data.get("email", "").strip()
+        geburtsdatum = data.get("geburtsdatum", "").strip()
+        pdf_base64 = data.get("pdf_base64")
+        filename = (data.get("filename") or "mandat.pdf").replace("/", "_").replace("\\", "_")
+
+        # Mailtext
+        mailtext = f"""Neue Mandatsanfrage:
 
 Name: {name}
 Geburtsdatum: {geburtsdatum}
 E-Mail: {email}
 """
 
-        msg = MIMEMultipart()
-        msg["Subject"] = f"{name}, Neue Mandatsformular Anfrage"
-        msg["From"] = EMAIL_HOST_USER
-        msg["To"] = EMAIL_TO
-        msg.attach(MIMEText(mailtext, "plain"))
+        # Admin-Mail vorbereiten
+        admin_msg = MIMEMultipart()
+        admin_msg["Subject"] = f"{name or 'Unbekannt'}, Neue Mandatsformular Anfrage"
+        admin_msg["From"] = EMAIL_HOST_USER
+        admin_msg["To"] = EMAIL_TO
+        admin_msg.attach(MIMEText(mailtext, "plain"))
 
         pdf_bytes = None
         if pdf_base64:
             try:
-                pdf_bytes = base64.b64decode(pdf_base64)
+                # Data-URL support
+                if isinstance(pdf_base64, str) and "," in pdf_base64:
+                    pdf_base64 = pdf_base64.split(",", 1)[1]
+                pdf_bytes = base64.b64decode(pdf_base64, validate=True)
                 part = MIMEApplication(pdf_bytes, Name=filename)
                 part['Content-Disposition'] = f'attachment; filename="{filename}"'
-                msg.attach(part)
+                admin_msg.attach(part)
             except Exception as e:
                 print("Fehler beim Dekodieren des PDFs:", str(e))
                 return jsonify({"success": False, "error": f"PDF Decode Fehler: {str(e)}"}), 400
         else:
             print("Warnung: Kein PDF im Request enthalten.")
 
-        context = ssl.create_default_context()
-        # Sende interne Mail an Admin
-        with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
-            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
-            server.sendmail(EMAIL_HOST_USER, EMAIL_TO, msg.as_string())
+        # Senden an Admin
+        ok, err = send_mail_with_fallback(admin_msg.as_string(), EMAIL_TO)
+        if not ok:
+            return jsonify({"success": False, "error": f"SMTP Fehler (Admin): {err}"}), 502
 
         print("E-Mail an Admin erfolgreich gesendet ✅")
 
-        # --------
-        # Sende Bestätigungsmail an den Kunden
-        # --------
+        # Bestätigung an Kunden (optional)
         if email:
             kunden_msg = MIMEMultipart()
             kunden_msg["Subject"] = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
-
-            kunden_text = f"""\
-Hallo {name},
+            kunden_text = f"""Hallo {name or 'Kunde'},
 
 Vielen Dank für Dein Vertrauen!
 
@@ -107,7 +182,7 @@ Nächste Schritte:
 • Versand Deiner klassischen Autobahn-Vignette im Januar per Post
 
 Wichtige Hinweise:
-• Pro Mandat und Kalenderjahr erhältst Du eine pyhische Autobahn-Vignette
+• Pro Mandat und Kalenderjahr erhältst Du eine physische Autobahn-Vignette
 • Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource Switzerland GmbH
 • Solltest Du eine E-Vignette wünschen, fordere diese bitte separat per E-Mail an: info@tradesource.ch
 
@@ -116,7 +191,6 @@ Unser Premium-Service ist schweizweit zertifiziert und für Dich garantiert kost
 Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
 Mit freundlichen Grüssen
-
 Dein TradeSource-Team
 
 FINMA Nr.: F01452693
@@ -126,24 +200,23 @@ Web: www.tradesource.ch
 
 Transparenz | Fairness | Sicherheit
 """
-
             kunden_msg.attach(MIMEText(kunden_text, "plain"))
 
-            # Optional: PDF auch an den Kunden anhängen
             if pdf_bytes:
                 part = MIMEApplication(pdf_bytes, Name=filename)
                 part['Content-Disposition'] = f'attachment; filename="{filename}"'
                 kunden_msg.attach(part)
 
-            with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
-                server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
-                server.sendmail(EMAIL_HOST_USER, email, kunden_msg.as_string())
+            ok, err = send_mail_with_fallback(kunden_msg.as_string(), email)
+            if not ok:
+                # Admin erfolgreich, Kunde fehlgeschlagen → 207 Multi-Status wäre overkill; wir geben success:true + warn zurück
+                return jsonify({"success": True, "warning": f"Admin ok, Bestätigung an Kunde fehlgeschlagen: {err}"}), 200
 
             print("Bestätigungsmail an Kunde erfolgreich gesendet ✅")
         else:
             print("Keine Kunden-E-Mail angegeben, Bestätigungsmail wird nicht versendet.")
 
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
 
     except Exception as e:
         print("Fehler in /api/sendmail:", str(e))
@@ -160,4 +233,5 @@ def custom_static(filename):
 # Lokaler Start
 # ----------------------------
 if __name__ == "__main__":
+    # Flask Dev-Server (in Prod hinter Gunicorn)
     app.run(host="0.0.0.0", port=5000)
