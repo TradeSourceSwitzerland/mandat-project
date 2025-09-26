@@ -38,9 +38,9 @@ if not EMAIL_HOST_PASSWORD:
 # ----------------------------
 # Utility: robustes Senden (STARTTLS/SSL Fallback)
 # ----------------------------
-def _send_via_starttls(msg_str, to_addr):
+def _send_via_starttls(msg_str: str, to_addr: str, port: int = 587):
     context = ssl.create_default_context()
-    with smtplib.SMTP(EMAIL_HOST, int(os.getenv("EMAIL_PORT", 587)), timeout=SMTP_TIMEOUT) as server:
+    with smtplib.SMTP(EMAIL_HOST, port, timeout=SMTP_TIMEOUT) as server:
         if EMAIL_DEBUG:
             server.set_debuglevel(1)
         server.ehlo()
@@ -49,28 +49,26 @@ def _send_via_starttls(msg_str, to_addr):
         server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
         server.sendmail(EMAIL_HOST_USER, to_addr, msg_str)
 
-def _send_via_ssl(msg_str, to_addr):
+def _send_via_ssl(msg_str: str, to_addr: str, port: int = 465):
     context = ssl.create_default_context()
-    port = int(os.getenv("EMAIL_PORT", 465))
     with smtplib.SMTP_SSL(EMAIL_HOST, port, context=context, timeout=SMTP_TIMEOUT) as server:
         if EMAIL_DEBUG:
             server.set_debuglevel(1)
         server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
         server.sendmail(EMAIL_HOST_USER, to_addr, msg_str)
 
-def send_mail_with_fallback(msg_str, to_addr):
+def send_mail_with_fallback(msg_str: str, to_addr: str):
     """
     Versucht in dieser Reihenfolge:
     - Wenn EMAIL_PORT gesetzt: nutzt gewählten Modus (EMAIL_SMTP_MODE) ODER leitet Port→Modus ab.
-    - Sonst AUTO: STARTTLS:587, dann SSL:465
+    - Sonst AUTO: STARTTLS@587, dann SSL@465
     """
     errors = []
 
-    # Bestimme Reihenfolge der Versuche
+    # Reihenfolge der Versuche bestimmen
     attempts = []
     if EMAIL_PORT:
         port = int(EMAIL_PORT)
-        # Port -> Modus ableiten falls AUTO
         mode = EMAIL_SMTP_MODE
         if mode == "AUTO":
             mode = "STARTTLS" if port == 587 else "SSL" if port == 465 else "STARTTLS"
@@ -86,11 +84,11 @@ def send_mail_with_fallback(msg_str, to_addr):
     for mode, port in attempts:
         try:
             if mode == "STARTTLS":
-                _send_via_starttls(msg_str, to_addr)
+                _send_via_starttls(msg_str, to_addr, port)
             else:
-                _send_via_ssl(msg_str, to_addr)
+                _send_via_ssl(msg_str, to_addr, port)
             return True, None
-        except (smtplib.SMTPAuthenticationError) as e:
+        except smtplib.SMTPAuthenticationError as e:
             return False, f"SMTP Auth fehlgeschlagen: {e}"
         except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, socket.timeout, OSError, smtplib.SMTPException) as e:
             errors.append(f"{mode}@{EMAIL_HOST}:{port} -> {e}")
@@ -118,7 +116,10 @@ def sendmail():
             return jsonify({"success": False, "error": "Content-Type muss application/json sein."}), 400
 
         data = request.get_json(force=True, silent=True) or {}
-        print("POST /api/sendmail empfangen:", {k: (v[:50] + "...") if isinstance(v, str) and len(v) > 60 else v for k,v in data.items()})
+        print("POST /api/sendmail empfangen:", {
+            k: (v[:50] + "...") if isinstance(v, str) and len(v) > 60 else v
+            for k, v in data.items()
+        })
 
         name = data.get("name", "").strip()
         email = data.get("email", "").strip()
@@ -209,7 +210,7 @@ Transparenz | Fairness | Sicherheit
 
             ok, err = send_mail_with_fallback(kunden_msg.as_string(), email)
             if not ok:
-                # Admin erfolgreich, Kunde fehlgeschlagen → 207 Multi-Status wäre overkill; wir geben success:true + warn zurück
+                # Admin ok, Kunde fehlgeschlagen -> success mit Warnung
                 return jsonify({"success": True, "warning": f"Admin ok, Bestätigung an Kunde fehlgeschlagen: {err}"}), 200
 
             print("Bestätigungsmail an Kunde erfolgreich gesendet ✅")
