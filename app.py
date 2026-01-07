@@ -95,16 +95,15 @@ E-Mail: {email}
             kunden_msg["To"] = email
 
             if form_source == "mandat_copy":
-                kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht"
+                kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht, Kontakter Dardan Bajrami"
                 kunden_text = f"""\
 Hallo {name},
 
-hiermit bestätigen wir den Eingang deines Mandats.
+Hiermit bestätigen wir den Eingang Deines Mandats.
 
-Das Mandat wurde erfolgreich durch unseren Kontakter  
-Dardan Bajrami bei TradeSource Switzerland GmbH eingereicht.
+Das Mandat wurde erfolgreich durch unseren Kontakter Herr Dardan Bajrami bei TradeSource Switzerland GmbH eingereicht.
 
-Bei Rückfragen stehen wir dir jederzeit gerne zur Verfügung.
+Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
 
 Freundliche Grüsse  
 TradeSource Switzerland GmbH
