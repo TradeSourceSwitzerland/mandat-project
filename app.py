@@ -42,6 +42,7 @@ def show_mandat_form():
 def sendmail():
     try:
         data = request.json
+        form_source = data.get("form_source", "mandat_original")
         print("POST /api/sendmail empfangen:", data)
 
         name = data.get("name", "")
@@ -90,11 +91,27 @@ E-Mail: {email}
         # --------
         if email:
             kunden_msg = MIMEMultipart()
-            kunden_msg["Subject"] = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
 
-            kunden_text = f"""\
+            if form_source == "mandat_copy":
+                kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht"
+                kunden_text = f"""\
+Hallo {name},
+
+hiermit bestätigen wir den Eingang deines Mandats.
+
+Das Mandat wurde erfolgreich durch unseren Kontakter  
+Dardan Bajrami bei TradeSource Switzerland GmbH eingereicht.
+
+Bei Rückfragen stehen wir dir jederzeit gerne zur Verfügung.
+
+Freundliche Grüsse  
+TradeSource Switzerland GmbH
+"""
+            else:
+                kunden_subject = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
+                kunden_text = f"""\
 Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
@@ -106,25 +123,11 @@ Nächste Schritte:
 • Bei positiver Rückmeldung automatische Aufnahme in unsere Vignetten-Aktion
 • Versand Deiner klassischen Autobahn-Vignette im Januar per Post
 
-Wichtige Hinweise:
-• Pro Mandat und Kalenderjahr erhältst Du eine physische Autobahn-Vignette
-• Voraussetzung ist ein aktives und kostenloses Mandatsverhältnis via TradeSource Switzerland GmbH
-• Fordere Deine Vignette | E-Vignette bitte separat mit dem Kontrollschild per E-Mail an: info@tradesource.ch
-
-Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
-
-Mit freundlichen Grüssen
-
+Mit freundlichen Grüssen  
 Dein TradeSource-Team
-
-FINMA Nr.: F01452693
-Direct: +41 43 883 00 07
-E-Mail: info@tradesource.ch
-Web: www.tradesource.ch
-
-Transparenz | Fairness | Sicherheit
 """
 
+            kunden_msg["Subject"] = kunden_subject
             kunden_msg.attach(MIMEText(kunden_text, "plain"))
 
             # Optional: PDF auch an den Kunden anhängen
