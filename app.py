@@ -94,16 +94,26 @@ E-Mail: {email}
             kunden_msg["From"] = EMAIL_HOST_USER
             kunden_msg["To"] = email
 
+            # Kontakter bestimmen
             if form_source == "mandat_copy":
-                kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht, Kontakter Dardan Bajrami"
+                kontakter = "Dardan Bajrami"
+            elif form_source == "mandat_jetmir":
+                kontakter = "Jetmir"
+            else:
+                kontakter = None
+
+            # Kundenmail-Text
+            if kontakter:
+                kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht"
                 kunden_text = f"""\
 Hallo {name},
 
-Hiermit bestätigen wir den Eingang Deines Mandats.
+hiermit bestätigen wir den Eingang deines Mandats.
 
-Das Mandat wurde erfolgreich durch unseren Kontakter Herr Dardan Bajrami bei TradeSource Switzerland GmbH eingereicht.
+Das Mandat wurde erfolgreich durch unseren Kontakter  
+{kontakter} bei TradeSource Switzerland GmbH eingereicht.
 
-Bei Rückfragen stehen wir Dir jederzeit gerne zur Verfügung.
+Bei Rückfragen stehen wir dir jederzeit gerne zur Verfügung.
 
 Freundliche Grüsse  
 TradeSource Switzerland GmbH
@@ -116,11 +126,6 @@ Hallo {name},
 Vielen Dank für Dein Vertrauen!
 
 Deine Anfrage wurde erfolgreich an Deine Versicherung weitergeleitet.
-
-Nächste Schritte:
-• Prüfung Deines Mandats durch die Versicherung
-• Bei positiver Rückmeldung automatische Aufnahme in unsere Vignetten-Aktion
-• Versand Deiner klassischen Autobahn-Vignette im Januar per Post
 
 Mit freundlichen Grüssen  
 Dein TradeSource-Team
@@ -142,6 +147,8 @@ Dein TradeSource-Team
             print("Bestätigungsmail an Kunde erfolgreich gesendet ✅")
         else:
             print("Keine Kunden-E-Mail angegeben, Bestätigungsmail wird nicht versendet.")
+
+
 
         return jsonify({"success": True})
 
