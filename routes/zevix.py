@@ -33,7 +33,7 @@ def init_db():
         );
     """)
 
-    # USAGE (pro Monat)
+    # USAGE (monatliche Nutzung)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usage (
             id SERIAL PRIMARY KEY,
@@ -56,7 +56,7 @@ init_db()
 zevix_bp = Blueprint("zevix", __name__)
 
 # ----------------------------
-# REGISTER (kein Plan setzen)
+# REGISTER (kein Plan setzen!)
 # ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
@@ -74,7 +74,7 @@ def register():
 
     try:
         cur.execute(
-            "INSERT INTO users (email, password, plan, valid_until) VALUES (%s, %s, NULL, NULL)",
+            "INSERT INTO users (email, password, plan, valid_until) VALUES (%s,%s,NULL,NULL)",
             (email, hashed.decode())
         )
         conn.commit()
@@ -87,7 +87,7 @@ def register():
     return jsonify({"success": True})
 
 # ----------------------------
-# LOGIN → blockieren ohne Abo
+# LOGIN (immer erlaubt!)
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def zevix_login():
@@ -108,26 +108,20 @@ def zevix_login():
     if not bcrypt.checkpw(password.encode(), stored):
         return jsonify({"success": False}), 401
 
+    # Plan kann NULL sein → Login trotzdem erlaubt
     plan = user["plan"]
 
-    # ❌ Kein Plan = kein Zugriff
-    if not plan:
-        cur.close()
-        conn.close()
-        return jsonify({
-            "success": False,
-            "message": "no_subscription"
-        }), 403
-
+    # Session-Zeit setzen (auch ohne Abo)
     auth_until = user["valid_until"]
     if not auth_until:
         auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
 
     month = datetime.now().strftime("%Y-%m")
 
+    # usage sicherstellen
     cur.execute("""
         INSERT INTO usage (user_email, month, used)
-        VALUES (%s, %s, 0)
+        VALUES (%s,%s,0)
         ON CONFLICT (user_email, month) DO NOTHING
     """, (email, month))
 
@@ -143,14 +137,14 @@ def zevix_login():
     return jsonify({
         "success": True,
         "email": email,
-        "plan": plan,
+        "plan": plan,          # kann NULL sein → Frontend zeigt "kein Abo"
         "auth_until": auth_until,
         "month": month,
         "used": used
     })
 
 # ----------------------------
-# LIMITS
+# PLAN LIMITS
 # ----------------------------
 PLAN_LIMITS = {
     "basic": 500,
@@ -159,7 +153,7 @@ PLAN_LIMITS = {
 }
 
 # ----------------------------
-# EXPORT LEADS
+# EXPORT LEADS (nur mit Abo!)
 # ----------------------------
 @zevix_bp.route("/zevix/export/<email>", methods=["GET"])
 def export_leads(email):
@@ -170,6 +164,7 @@ def export_leads(email):
     cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
+    # ❌ Ohne Plan kein Zugriff auf Leads
     if not user or not user["plan"]:
         return jsonify({"success": False, "message": "no_subscription"}), 403
 
@@ -180,7 +175,7 @@ def export_leads(email):
 
     cur.execute("""
         INSERT INTO usage (user_email, month, used)
-        VALUES (%s, %s, 0)
+        VALUES (%s,%s,0)
         ON CONFLICT (user_email, month) DO NOTHING
     """, (email, month))
 
@@ -191,10 +186,10 @@ def export_leads(email):
     used = cur.fetchone()["used"]
 
     if used >= monthly_limit:
-        return jsonify({"success": False, "message": "Limit reached"}), 403
+        return jsonify({"success": False, "message": "limit_reached"}), 403
 
+    # Excel bleibt Datenquelle
     EXPORT_SIZE = 50
-
     df = pd.read_excel("data/master.xlsx")
     df_export = df.sample(min(EXPORT_SIZE, len(df)))
 
