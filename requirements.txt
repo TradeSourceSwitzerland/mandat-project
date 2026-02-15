@@ -1,3 +1,4 @@
 Flask
 gunicorn
 Flask-CORS
+psycopg2-binary==2.9.9
