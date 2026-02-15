@@ -3,6 +3,9 @@ import psycopg
 from psycopg.rows import dict_row
 import bcrypt
 from flask import Blueprint, jsonify, request
+from datetime import datetime
+import pandas as pd
+import tempfile
 
 # ----------------------------
 # DATABASE CONNECTION
@@ -19,13 +22,28 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
+
+    # USERS
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            plan TEXT DEFAULT 'basic'
         );
     """)
+
+    # USAGE (zählt verbrauchte Leads pro Monat)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS usage (
+            id SERIAL PRIMARY KEY,
+            user_email TEXT NOT NULL,
+            month TEXT NOT NULL,
+            used INTEGER DEFAULT 0,
+            UNIQUE(user_email, month)
+        );
+    """)
+
     conn.commit()
     cur.close()
     conn.close()
