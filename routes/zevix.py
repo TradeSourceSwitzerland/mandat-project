@@ -22,13 +22,13 @@ def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
-    # USERS
+    # USERS (kein Default-Plan!)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            plan TEXT DEFAULT 'basic',
+            plan TEXT,
             valid_until BIGINT
         );
     """)
@@ -56,14 +56,7 @@ init_db()
 zevix_bp = Blueprint("zevix", __name__)
 
 # ----------------------------
-# HEALTH CHECK
-# ----------------------------
-@zevix_bp.route("/zevix/health", methods=["GET"])
-def zevix_health():
-    return jsonify({"status": "ZEVIX backend running"})
-
-# ----------------------------
-# REGISTER
+# REGISTER (kein Plan setzen)
 # ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
@@ -81,7 +74,7 @@ def register():
 
     try:
         cur.execute(
-            "INSERT INTO users (email, password) VALUES (%s, %s)",
+            "INSERT INTO users (email, password, plan, valid_until) VALUES (%s, %s, NULL, NULL)",
             (email, hashed.decode())
         )
         conn.commit()
@@ -94,7 +87,7 @@ def register():
     return jsonify({"success": True})
 
 # ----------------------------
-# LOGIN (liefert Werte fürs bestehende Dashboard!)
+# LOGIN → blockieren ohne Abo
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def zevix_login():
@@ -115,18 +108,23 @@ def zevix_login():
     if not bcrypt.checkpw(password.encode(), stored):
         return jsonify({"success": False}), 401
 
-    # Plan bestimmen
-    plan = user["plan"] or "basic"
+    plan = user["plan"]
 
-    # Ablaufdatum (30 Tage wenn noch keines gesetzt)
+    # ❌ Kein Plan = kein Zugriff
+    if not plan:
+        cur.close()
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "no_subscription"
+        }), 403
+
     auth_until = user["valid_until"]
     if not auth_until:
         auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
 
-    # Monat bestimmen
     month = datetime.now().strftime("%Y-%m")
 
-    # Usage sicherstellen
     cur.execute("""
         INSERT INTO usage (user_email, month, used)
         VALUES (%s, %s, 0)
@@ -161,7 +159,7 @@ PLAN_LIMITS = {
 }
 
 # ----------------------------
-# EXPORT LEADS (Excel bleibt Quelle!)
+# EXPORT LEADS
 # ----------------------------
 @zevix_bp.route("/zevix/export/<email>", methods=["GET"])
 def export_leads(email):
@@ -172,10 +170,10 @@ def export_leads(email):
     cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
-    if not user:
-        return jsonify({"success": False}), 404
+    if not user or not user["plan"]:
+        return jsonify({"success": False, "message": "no_subscription"}), 403
 
-    plan = user["plan"] or "basic"
+    plan = user["plan"]
     monthly_limit = PLAN_LIMITS.get(plan, 500)
 
     month = datetime.now().strftime("%Y-%m")
@@ -213,10 +211,4 @@ def export_leads(email):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     df_export.to_excel(tmp.name, index=False)
 
-    response = send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
-
-    # Frontend kann damit localStorage syncen wenn nötig
-    response.headers["X-Month"] = month
-    response.headers["X-New-Used"] = str(used + len(df_export))
-
-    return response
+    return send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
