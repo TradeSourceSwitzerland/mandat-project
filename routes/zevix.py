@@ -2,7 +2,7 @@ import os
 import psycopg
 from psycopg.rows import dict_row
 import bcrypt
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from datetime import datetime
 import pandas as pd
 import tempfile
@@ -13,11 +13,10 @@ import tempfile
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
-    # Render Postgres braucht sslmode=require
     return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
 
 # ----------------------------
-# INITIALIZE DATABASE (create table if missing)
+# INITIALIZE DATABASE
 # ----------------------------
 def init_db():
     conn = get_conn()
@@ -29,11 +28,12 @@ def init_db():
             id SERIAL PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            plan TEXT DEFAULT 'basic'
+            plan TEXT DEFAULT 'basic',
+            valid_until BIGINT
         );
     """)
 
-    # USAGE (zählt verbrauchte Leads pro Monat)
+    # USAGE (pro Monat)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usage (
             id SERIAL PRIMARY KEY,
@@ -48,7 +48,6 @@ def init_db():
     cur.close()
     conn.close()
 
-# Tabelle beim Start sicherstellen
 init_db()
 
 # ----------------------------
@@ -64,19 +63,18 @@ def zevix_health():
     return jsonify({"status": "ZEVIX backend running"})
 
 # ----------------------------
-# REGISTER USER
+# REGISTER
 # ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
     data = request.get_json()
-
     email = data.get("email")
     password = data.get("password")
 
     if not email or not password:
-        return jsonify({"success": False, "message": "Missing email or password"}), 400
+        return jsonify({"success": False}), 400
 
-    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
     conn = get_conn()
     cur = conn.cursor()
@@ -84,11 +82,11 @@ def register():
     try:
         cur.execute(
             "INSERT INTO users (email, password) VALUES (%s, %s)",
-            (email, hashed.decode("utf-8"))
+            (email, hashed.decode())
         )
         conn.commit()
-    except Exception:
-        return jsonify({"success": False, "message": "User already exists"}), 400
+    except:
+        return jsonify({"success": False, "message": "User exists"}), 400
     finally:
         cur.close()
         conn.close()
@@ -96,45 +94,65 @@ def register():
     return jsonify({"success": True})
 
 # ----------------------------
-# LOGIN USER
+# LOGIN (liefert Werte fürs bestehende Dashboard!)
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def zevix_login():
     data = request.get_json()
-
     email = data.get("email")
     password = data.get("password")
 
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+    cur.execute("SELECT * FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
+
+    if not user:
+        return jsonify({"success": False}), 404
+
+    stored = user["password"].encode()
+    if not bcrypt.checkpw(password.encode(), stored):
+        return jsonify({"success": False}), 401
+
+    # Plan bestimmen
+    plan = user["plan"] or "basic"
+
+    # Ablaufdatum (30 Tage wenn noch keines gesetzt)
+    auth_until = user["valid_until"]
+    if not auth_until:
+        auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
+
+    # Monat bestimmen
+    month = datetime.now().strftime("%Y-%m")
+
+    # Usage sicherstellen
+    cur.execute("""
+        INSERT INTO usage (user_email, month, used)
+        VALUES (%s, %s, 0)
+        ON CONFLICT (user_email, month) DO NOTHING
+    """, (email, month))
+
+    cur.execute(
+        "SELECT used FROM usage WHERE user_email=%s AND month=%s",
+        (email, month)
+    )
+    used = cur.fetchone()["used"]
 
     cur.close()
     conn.close()
 
-    if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
-
-    stored_password = user["password"]
-
-    # psycopg kann memoryview zurückgeben → konvertieren
-    if isinstance(stored_password, memoryview):
-        stored_password = stored_password.tobytes()
-    elif isinstance(stored_password, str):
-        stored_password = stored_password.encode("utf-8")
-
-    if not bcrypt.checkpw(password.encode("utf-8"), stored_password):
-        return jsonify({"success": False, "message": "Wrong password"}), 401
-
     return jsonify({
         "success": True,
-        "user": {"email": email}
+        "email": email,
+        "plan": plan,
+        "auth_until": auth_until,
+        "month": month,
+        "used": used
     })
 
 # ----------------------------
-# LEADS EXPORT (MIT ABO-LIMIT)
+# LIMITS
 # ----------------------------
 PLAN_LIMITS = {
     "basic": 500,
@@ -142,26 +160,26 @@ PLAN_LIMITS = {
     "enterprise": 4500
 }
 
+# ----------------------------
+# EXPORT LEADS (Excel bleibt Quelle!)
+# ----------------------------
 @zevix_bp.route("/zevix/export/<email>", methods=["GET"])
 def export_leads(email):
 
     conn = get_conn()
     cur = conn.cursor()
 
-    # User + Plan holen
     cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
     if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
+        return jsonify({"success": False}), 404
 
     plan = user["plan"] or "basic"
     monthly_limit = PLAN_LIMITS.get(plan, 500)
 
-    # Monat bestimmen (für Reset jeden Monat)
     month = datetime.now().strftime("%Y-%m")
 
-    # Sicherstellen dass Usage-Zeile existiert
     cur.execute("""
         INSERT INTO usage (user_email, month, used)
         VALUES (%s, %s, 0)
@@ -175,20 +193,13 @@ def export_leads(email):
     used = cur.fetchone()["used"]
 
     if used >= monthly_limit:
-        cur.close()
-        conn.close()
-        return jsonify({"success": False, "message": "Monatslimit erreicht"}), 403
+        return jsonify({"success": False, "message": "Limit reached"}), 403
 
-    # Wie viele Leads pro Export
     EXPORT_SIZE = 50
 
-    # Master-Datei laden
     df = pd.read_excel("data/master.xlsx")
-
-    # Zufällige Leads ziehen
     df_export = df.sample(min(EXPORT_SIZE, len(df)))
 
-    # Usage erhöhen
     cur.execute("""
         UPDATE usage
         SET used = used + %s
@@ -199,9 +210,13 @@ def export_leads(email):
     cur.close()
     conn.close()
 
-    # Temporäre Datei erzeugen
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     df_export.to_excel(tmp.name, index=False)
 
-    from flask import send_file
-    return send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
+    response = send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
+
+    # Frontend kann damit localStorage syncen wenn nötig
+    response.headers["X-Month"] = month
+    response.headers["X-New-Used"] = str(used + len(df_export))
+
+    return response
