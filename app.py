@@ -8,8 +8,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
+# ZEVIX Route laden
+from routes.zevix import zevix_bp
+
 app = Flask(__name__)
 CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
+# ZEVIX Blueprint registrieren
+app.register_blueprint(zevix_bp)
 # ----------------------------
 # Health‑Check für Wake‑Up Pings
 # ----------------------------
