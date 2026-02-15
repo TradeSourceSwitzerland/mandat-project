@@ -6,23 +6,36 @@ from flask import Blueprint, jsonify, request, send_file
 from datetime import datetime
 import pandas as pd
 import tempfile
+import requests
+from io import BytesIO
+
+# ----------------------------
+# CONFIG
+# ----------------------------
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# 👉 DEINE WEBFLOW EXCEL DATEI
+EXCEL_URL = "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6981481c65c177045e58fbd2_shab_zefix_adressen_2026-02-03_0157.xlsx"
+
 
 # ----------------------------
 # DATABASE CONNECTION
 # ----------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL not set")
+        raise RuntimeError("DATABASE_URL missing")
     return psycopg.connect(
         f"{DATABASE_URL}?sslmode=require",
         row_factory=dict_row
     )
 
+
 # ----------------------------
-# INITIALIZE DATABASE (RUN SAFE)
+# INIT DB (Render-safe lazy init)
 # ----------------------------
+
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
@@ -51,15 +64,13 @@ def init_db():
     cur.close()
     conn.close()
 
+
 # ----------------------------
 # BLUEPRINT
 # ----------------------------
+
 zevix_bp = Blueprint("zevix", __name__)
 
-# ----------------------------
-# ENSURE DB ONLY AFTER APP START
-# (FIXT RENDER DEPLOY CRASH)
-# ----------------------------
 _db_ready = False
 
 @zevix_bp.before_app_request
@@ -69,9 +80,11 @@ def ensure_db():
         init_db()
         _db_ready = True
 
+
 # ----------------------------
 # REGISTER
 # ----------------------------
+
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -88,7 +101,7 @@ def register():
 
     try:
         cur.execute(
-            "INSERT INTO users (email, password, plan, valid_until) VALUES (%s,%s,NULL,NULL)",
+            "INSERT INTO users (email,password,plan,valid_until) VALUES (%s,%s,NULL,NULL)",
             (email, hashed)
         )
         conn.commit()
@@ -100,11 +113,13 @@ def register():
 
     return jsonify({"success": True})
 
+
 # ----------------------------
-# LOGIN
+# LOGIN (auch ohne Abo erlaubt)
 # ----------------------------
+
 @zevix_bp.route("/zevix/login", methods=["POST"])
-def zevix_login():
+def login():
     data = request.get_json()
     email = data.get("email")
     password = data.get("password")
@@ -130,9 +145,9 @@ def zevix_login():
     month = datetime.now().strftime("%Y-%m")
 
     cur.execute("""
-        INSERT INTO usage (user_email, month, used)
+        INSERT INTO usage (user_email,month,used)
         VALUES (%s,%s,0)
-        ON CONFLICT (user_email, month) DO NOTHING
+        ON CONFLICT (user_email,month) DO NOTHING
     """, (email, month))
 
     cur.execute(
@@ -153,20 +168,19 @@ def zevix_login():
         "used": used
     })
 
+
 # ----------------------------
-# PLAN LIMITS
+# EXPORT LEADS (nur mit Abo!)
 # ----------------------------
+
 PLAN_LIMITS = {
     "basic": 500,
     "business": 1000,
     "enterprise": 4500
 }
 
-# ----------------------------
-# EXPORT LEADS (ONLY WITH PLAN)
-# ----------------------------
 @zevix_bp.route("/zevix/export/<email>", methods=["GET"])
-def export_leads(email):
+def export(email):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -183,30 +197,24 @@ def export_leads(email):
     month = datetime.now().strftime("%Y-%m")
 
     cur.execute("""
-        INSERT INTO usage (user_email, month, used)
-        VALUES (%s,%s,0)
-        ON CONFLICT (user_email, month) DO NOTHING
+        SELECT used FROM usage WHERE user_email=%s AND month=%s
     """, (email, month))
-
-    cur.execute(
-        "SELECT used FROM usage WHERE user_email=%s AND month=%s",
-        (email, month)
-    )
     used = cur.fetchone()["used"]
 
     if used >= monthly_limit:
         return jsonify({"success": False, "message": "limit_reached"}), 403
 
-    # ---------- LOAD EXCEL SAFELY ----------
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    excel_path = os.path.join(base_dir, "data", "master.xlsx")
 
-    df = pd.read_excel(excel_path)
+    # ✅ LOAD EXCEL FROM WEBFLOW CDN
+    response = requests.get(EXCEL_URL)
+    response.raise_for_status()
+
+    df = pd.read_excel(BytesIO(response.content))
+
     df_export = df.sample(min(50, len(df)))
 
     cur.execute("""
-        UPDATE usage
-        SET used = used + %s
+        UPDATE usage SET used = used + %s
         WHERE user_email=%s AND month=%s
     """, (len(df_export), email, month))
 
