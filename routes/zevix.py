@@ -66,7 +66,7 @@ def zevix_login():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
     user = cur.fetchone()
 
     cur.close()
