@@ -13,16 +13,20 @@ import tempfile
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
-    return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL not set")
+    return psycopg.connect(
+        f"{DATABASE_URL}?sslmode=require",
+        row_factory=dict_row
+    )
 
 # ----------------------------
-# INITIALIZE DATABASE
+# INITIALIZE DATABASE (RUN SAFE)
 # ----------------------------
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
-    # USERS (kein Default-Plan!)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -33,7 +37,6 @@ def init_db():
         );
     """)
 
-    # USAGE (monatliche Nutzung)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usage (
             id SERIAL PRIMARY KEY,
@@ -48,15 +51,26 @@ def init_db():
     cur.close()
     conn.close()
 
-init_db()
-
 # ----------------------------
 # BLUEPRINT
 # ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
 
 # ----------------------------
-# REGISTER (kein Plan setzen!)
+# ENSURE DB ONLY AFTER APP START
+# (FIXT RENDER DEPLOY CRASH)
+# ----------------------------
+_db_ready = False
+
+@zevix_bp.before_app_request
+def ensure_db():
+    global _db_ready
+    if not _db_ready:
+        init_db()
+        _db_ready = True
+
+# ----------------------------
+# REGISTER
 # ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
@@ -67,7 +81,7 @@ def register():
     if not email or not password:
         return jsonify({"success": False}), 400
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
     conn = get_conn()
     cur = conn.cursor()
@@ -75,10 +89,10 @@ def register():
     try:
         cur.execute(
             "INSERT INTO users (email, password, plan, valid_until) VALUES (%s,%s,NULL,NULL)",
-            (email, hashed.decode())
+            (email, hashed)
         )
         conn.commit()
-    except:
+    except psycopg.errors.UniqueViolation:
         return jsonify({"success": False, "message": "User exists"}), 400
     finally:
         cur.close()
@@ -87,7 +101,7 @@ def register():
     return jsonify({"success": True})
 
 # ----------------------------
-# LOGIN (immer erlaubt!)
+# LOGIN
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def zevix_login():
@@ -104,21 +118,17 @@ def zevix_login():
     if not user:
         return jsonify({"success": False}), 404
 
-    stored = user["password"].encode()
-    if not bcrypt.checkpw(password.encode(), stored):
+    if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return jsonify({"success": False}), 401
 
-    # Plan kann NULL sein → Login trotzdem erlaubt
-    plan = user["plan"]
+    plan = user["plan"]  # darf NULL sein
 
-    # Session-Zeit setzen (auch ohne Abo)
     auth_until = user["valid_until"]
     if not auth_until:
         auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
 
     month = datetime.now().strftime("%Y-%m")
 
-    # usage sicherstellen
     cur.execute("""
         INSERT INTO usage (user_email, month, used)
         VALUES (%s,%s,0)
@@ -137,7 +147,7 @@ def zevix_login():
     return jsonify({
         "success": True,
         "email": email,
-        "plan": plan,          # kann NULL sein → Frontend zeigt "kein Abo"
+        "plan": plan,
         "auth_until": auth_until,
         "month": month,
         "used": used
@@ -153,7 +163,7 @@ PLAN_LIMITS = {
 }
 
 # ----------------------------
-# EXPORT LEADS (nur mit Abo!)
+# EXPORT LEADS (ONLY WITH PLAN)
 # ----------------------------
 @zevix_bp.route("/zevix/export/<email>", methods=["GET"])
 def export_leads(email):
@@ -164,7 +174,6 @@ def export_leads(email):
     cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
-    # ❌ Ohne Plan kein Zugriff auf Leads
     if not user or not user["plan"]:
         return jsonify({"success": False, "message": "no_subscription"}), 403
 
@@ -188,10 +197,12 @@ def export_leads(email):
     if used >= monthly_limit:
         return jsonify({"success": False, "message": "limit_reached"}), 403
 
-    # Excel bleibt Datenquelle
-    EXPORT_SIZE = 50
-    df = pd.read_excel("data/master.xlsx")
-    df_export = df.sample(min(EXPORT_SIZE, len(df)))
+    # ---------- LOAD EXCEL SAFELY ----------
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    excel_path = os.path.join(base_dir, "data", "master.xlsx")
+
+    df = pd.read_excel(excel_path)
+    df_export = df.sample(min(50, len(df)))
 
     cur.execute("""
         UPDATE usage
