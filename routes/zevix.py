@@ -132,3 +132,76 @@ def zevix_login():
         "success": True,
         "user": {"email": email}
     })
+
+# ----------------------------
+# LEADS EXPORT (MIT ABO-LIMIT)
+# ----------------------------
+PLAN_LIMITS = {
+    "basic": 500,
+    "business": 1000,
+    "enterprise": 4500
+}
+
+@zevix_bp.route("/zevix/export/<email>", methods=["GET"])
+def export_leads(email):
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # User + Plan holen
+    cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+    user = cur.fetchone()
+
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    plan = user["plan"] or "basic"
+    monthly_limit = PLAN_LIMITS.get(plan, 500)
+
+    # Monat bestimmen (für Reset jeden Monat)
+    month = datetime.now().strftime("%Y-%m")
+
+    # Sicherstellen dass Usage-Zeile existiert
+    cur.execute("""
+        INSERT INTO usage (user_email, month, used)
+        VALUES (%s, %s, 0)
+        ON CONFLICT (user_email, month) DO NOTHING
+    """, (email, month))
+
+    cur.execute(
+        "SELECT used FROM usage WHERE user_email=%s AND month=%s",
+        (email, month)
+    )
+    used = cur.fetchone()["used"]
+
+    if used >= monthly_limit:
+        cur.close()
+        conn.close()
+        return jsonify({"success": False, "message": "Monatslimit erreicht"}), 403
+
+    # Wie viele Leads pro Export
+    EXPORT_SIZE = 50
+
+    # Master-Datei laden
+    df = pd.read_excel("data/master.xlsx")
+
+    # Zufällige Leads ziehen
+    df_export = df.sample(min(EXPORT_SIZE, len(df)))
+
+    # Usage erhöhen
+    cur.execute("""
+        UPDATE usage
+        SET used = used + %s
+        WHERE user_email=%s AND month=%s
+    """, (len(df_export), email, month))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Temporäre Datei erzeugen
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    df_export.to_excel(tmp.name, index=False)
+
+    from flask import send_file
+    return send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
