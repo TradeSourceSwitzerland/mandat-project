@@ -10,9 +10,32 @@ from flask import Blueprint, jsonify, request
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    # Render Postgres braucht sslmode=require
+    return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
 
-# Blueprint
+# ----------------------------
+# INITIALIZE DATABASE (create table if missing)
+# ----------------------------
+def init_db():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        );
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# Tabelle beim Start sicherstellen
+init_db()
+
+# ----------------------------
+# BLUEPRINT
+# ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
 
 # ----------------------------
@@ -21,7 +44,6 @@ zevix_bp = Blueprint("zevix", __name__)
 @zevix_bp.route("/zevix/health", methods=["GET"])
 def zevix_health():
     return jsonify({"status": "ZEVIX backend running"})
-
 
 # ----------------------------
 # REGISTER USER
@@ -32,6 +54,9 @@ def register():
 
     email = data.get("email")
     password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"success": False, "message": "Missing email or password"}), 400
 
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
@@ -51,7 +76,6 @@ def register():
         conn.close()
 
     return jsonify({"success": True})
-
 
 # ----------------------------
 # LOGIN USER
@@ -77,7 +101,7 @@ def zevix_login():
 
     stored_password = user["password"]
 
-    # psycopg kann verschiedene Typen zurückgeben → sauber konvertieren
+    # psycopg kann memoryview zurückgeben → konvertieren
     if isinstance(stored_password, memoryview):
         stored_password = stored_password.tobytes()
     elif isinstance(stored_password, str):
