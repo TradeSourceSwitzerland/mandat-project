@@ -75,7 +75,15 @@ def zevix_login():
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    if not bcrypt.checkpw(password.encode("utf-8"), user["password"].encode("utf-8")):
+    stored_password = user["password"]
+
+    # psycopg kann verschiedene Typen zurückgeben → sauber konvertieren
+    if isinstance(stored_password, memoryview):
+        stored_password = stored_password.tobytes()
+    elif isinstance(stored_password, str):
+        stored_password = stored_password.encode("utf-8")
+
+    if not bcrypt.checkpw(password.encode("utf-8"), stored_password):
         return jsonify({"success": False, "message": "Wrong password"}), 401
 
     return jsonify({
