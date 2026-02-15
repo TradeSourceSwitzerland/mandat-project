@@ -36,7 +36,7 @@ def register():
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
     conn = get_conn()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     try:
         cur.execute(
@@ -64,7 +64,7 @@ def zevix_login():
     password = data.get("password")
 
     conn = get_conn()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     cur.execute("SELECT * FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
