@@ -104,18 +104,17 @@ def cookie_options():
     elif COOKIE_SECURE in {"false", "0", "no", "off"}:
         secure = False
 
-    # SameSite-Einstellung basierend auf Secure-Flag
     if COOKIE_SAMESITE in {"lax", "strict", "none"}:
         samesite = COOKIE_SAMESITE.capitalize()
     else:
-        samesite = "None" if secure else "Lax"  # SameSite=None benötigt Secure=True
+        # SameSite=None benötigt Secure=True
+        samesite = "None" if secure else "Lax"
 
-    # Setze explizit die Domain auf www.zevix.ch
     return {
         "secure": secure,
         "samesite": samesite,
         "domain": "www.zevix.ch",  # Setze die Domain explizit
-        "max_age": 30 * 24 * 60 * 60,  # Cookie lebt 30 Tage
+        "max_age": 30 * 24 * 60 * 60,
     }
 
 
@@ -308,6 +307,9 @@ def login():
     # JWT Token erstellen
     token = create_jwt_token(email)
 
+    # Debugging-Ausgabe
+    print(f"Token für {email}: {token}")
+
     # Erstelle ein Antwortobjekt mit Cookie
     response = jsonify({"success": True, **session, "token": token})
 
@@ -318,7 +320,7 @@ def login():
         "auth_token",
         token,
         httponly=True,
-        **cookie_cfg,  # Die Domain wird hier explizit gesetzt
+        **cookie_cfg,
     )  # 30 Tage
     print("Cookie gesetzt: auth_token")  # Debugging-Ausgabe
 
