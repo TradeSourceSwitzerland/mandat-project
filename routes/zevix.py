@@ -218,6 +218,61 @@ def consume_leads():
         "newly_used": newly_used
     })
 
+# ----------------------------
+# SESSION SYNC (Dashboard Refresh)
+# ----------------------------
+@zevix_bp.route("/zevix/session-sync", methods=["POST"])
+def session_sync():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+
+    if not email:
+        return jsonify({"success": False}), 400
+
+    month = datetime.now().strftime("%Y-%m")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan, valid_until FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
+
+            if not user:
+                return jsonify({"success": False}), 404
+
+            auth_until = user.get("valid_until")
+            if not auth_until:
+                auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
+
+            cur.execute(
+                """
+                INSERT INTO usage (user_email,month,used,used_ids)
+                VALUES (%s,%s,0,'[]'::jsonb)
+                ON CONFLICT (user_email,month) DO NOTHING
+                """,
+                (email, month)
+            )
+
+            cur.execute(
+                """
+                SELECT used, used_ids
+                FROM usage
+                WHERE user_email=%s AND month=%s
+                """,
+                (email, month)
+            )
+            usage = cur.fetchone() or {}
+
+        conn.commit()
+
+    return jsonify({
+        "success": True,
+        "email": email,
+        "plan": user.get("plan"),
+        "auth_until": auth_until,
+        "month": month,
+        "used": int(usage.get("used") or 0),
+        "used_ids": usage.get("used_ids") or []
+    })
 
 # ----------------------------
 # INIT DB ON IMPORT
