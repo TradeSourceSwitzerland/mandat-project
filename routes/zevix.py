@@ -250,7 +250,7 @@ def consume_leads():
 
     month = get_month_key()
 
-    # normalize incoming ids
+    # IDs normalisieren
     normalized_ids = []
     for i in lead_ids:
         s = str(i).strip().lower()
@@ -260,24 +260,35 @@ def consume_leads():
     with get_conn() as conn:
         with conn.cursor() as cur:
 
-            # ensure usage row exists
-            cur.execute(
-                """
+            # --- USER + PLAN LADEN ---
+            cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
+            if not user:
+                return jsonify({"success": False, "message": "user_not_found"}), 404
+
+            plan = normalize_plan(user.get("plan"))
+
+            LIMITS = {
+                "basic": 500,
+                "business": 1000,
+                "enterprise": 4500,
+                "none": 0
+            }
+            limit = LIMITS.get(plan, 0)
+
+            # --- USAGE ROW SICHERSTELLEN ---
+            cur.execute("""
                 INSERT INTO usage (user_email, month, used, used_ids)
                 VALUES (%s, %s, 0, '[]'::jsonb)
                 ON CONFLICT (user_email, month) DO NOTHING
-                """,
-                (email, month)
-            )
+            """, (email, month))
 
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT used, used_ids
                 FROM usage
                 WHERE user_email=%s AND month=%s
-                """,
-                (email, month)
-            )
+            """, (email, month))
+
             row = cur.fetchone() or {}
             used = int(row.get("used") or 0)
             stored_ids = set(row.get("used_ids") or [])
@@ -285,19 +296,19 @@ def consume_leads():
             newly_used = 0
             for lid in normalized_ids:
                 if lid not in stored_ids:
+                    if used + newly_used >= limit:
+                        break  # LIMIT ERREICHT
                     stored_ids.add(lid)
                     newly_used += 1
 
             new_used = used + newly_used
 
-            cur.execute(
-                """
+            # --- UPDATE ---
+            cur.execute("""
                 UPDATE usage
                 SET used=%s, used_ids=%s::jsonb
                 WHERE user_email=%s AND month=%s
-                """,
-                (new_used, json.dumps(list(stored_ids)), email, month)
-            )
+            """, (new_used, json.dumps(list(stored_ids)), email, month))
 
         conn.commit()
 
@@ -306,7 +317,8 @@ def consume_leads():
         "month": month,
         "used": new_used,
         "used_ids": list(stored_ids),
-        "newly_used": newly_used
+        "newly_used": newly_used,
+        "limit": limit
     })
 
 # ----------------------------
