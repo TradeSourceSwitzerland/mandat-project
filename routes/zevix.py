@@ -10,6 +10,20 @@ from datetime import datetime
 # CONFIG
 # ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
+VALID_PLANS = {"none", "basic", "business", "enterprise"}
+
+
+# ----------------------------
+# HELPERS
+# ----------------------------
+def normalize_plan(plan):
+    p = str(plan or "none").strip().lower()
+    return p if p in VALID_PLANS else "none"
+
+
+def default_auth_until_ms():
+    return int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
+
 
 # ----------------------------
 # DATABASE CONNECTION
@@ -22,6 +36,7 @@ def get_conn():
         f"{DATABASE_URL}?sslmode=require",
         row_factory=dict_row
     )
+
 
 # ----------------------------
 # INIT DB (lightweight)
@@ -59,12 +74,21 @@ def init_db():
                 ADD COLUMN IF NOT EXISTS used_ids JSONB DEFAULT '[]'::jsonb
             """)
 
+            # Saubere Defaults für bestehende Nutzer
+            cur.execute("""
+                UPDATE users
+                SET plan='none'
+                WHERE plan IS NULL OR trim(plan)=''
+            """)
+
         conn.commit()
+
 
 # ----------------------------
 # BLUEPRINT
 # ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
+
 
 # ----------------------------
 # REGISTER
@@ -86,6 +110,8 @@ def register():
                 cur.execute(
                     "INSERT INTO users (email,password) VALUES (%s,%s)",
                     (email, hashed)
+                    "INSERT INTO users (email,password,plan) VALUES (%s,%s,%s)",
+                    (email, hashed, "none")
                 )
             conn.commit()
 
@@ -122,6 +148,14 @@ def login():
             auth_until = user.get("valid_until")
             if not auth_until:
                 auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
+            auth_until = user.get("valid_until") or default_auth_until_ms()
+            plan = normalize_plan(user.get("plan"))
+
+            # Persistiere saubere Defaults
+            cur.execute(
+                "UPDATE users SET plan=%s, valid_until=COALESCE(valid_until, %s) WHERE email=%s",
+                (plan, auth_until, email)
+            )
 
             month = datetime.now().strftime("%Y-%m")
 
@@ -147,6 +181,7 @@ def login():
         "success": True,
         "email": email,
         "plan": user.get("plan"),
+        "plan": plan,
         "auth_until": auth_until,
         "month": month,
         "used": used,
@@ -156,6 +191,54 @@ def login():
 
 # ----------------------------
 # LEAD CONSUMPTION (REAL FIX)
+# SUBSCRIPTION UPDATE (for checkout success pages)
+# ----------------------------
+@zevix_bp.route("/zevix/update-subscription", methods=["POST"])
+def update_subscription():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    plan = normalize_plan(data.get("plan"))
+    auth_until = data.get("auth_until")
+
+    if not email:
+        return jsonify({"success": False, "message": "email_missing"}), 400
+
+    if plan == "none":
+        return jsonify({"success": False, "message": "invalid_plan"}), 400
+
+    try:
+        auth_until = int(auth_until) if auth_until is not None else default_auth_until_ms()
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "invalid_auth_until"}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET plan=%s, valid_until=%s
+                WHERE email=%s
+                RETURNING email
+                """,
+                (plan, auth_until, email)
+            )
+            updated = cur.fetchone()
+
+            if not updated:
+                return jsonify({"success": False, "message": "user_not_found"}), 404
+
+        conn.commit()
+
+    return jsonify({
+        "success": True,
+        "email": email,
+        "plan": plan,
+        "auth_until": auth_until
+    })
+
+
+# ----------------------------
+# LEAD CONSUMPTION
 # ----------------------------
 @zevix_bp.route("/zevix/consume-leads", methods=["POST"])
 def consume_leads():
@@ -181,14 +264,7 @@ def consume_leads():
                 FROM usage
                 WHERE user_email=%s AND month=%s
             """, (email, month))
-
-            row = cur.fetchone()
-
-            if not row:
-                stored_ids = set()
-                used = 0
-            else:
-                stored_ids = set(row.get("used_ids") or [])
+@@ -192,39 +268,102 @@ def consume_leads():
                 used = int(row.get("used") or 0)
 
             newly_used = 0
@@ -214,9 +290,12 @@ def consume_leads():
 
     return jsonify({
         "success": True,
+        "month": month,
         "used": new_used,
+        "used_ids": list(stored_ids),
         "newly_used": newly_used
     })
+
 
 # ----------------------------
 # SESSION SYNC (Dashboard Refresh)
@@ -239,9 +318,13 @@ def session_sync():
             if not user:
                 return jsonify({"success": False}), 404
 
-            auth_until = user.get("valid_until")
-            if not auth_until:
-                auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
+            auth_until = user.get("valid_until") or default_auth_until_ms()
+            plan = normalize_plan(user.get("plan"))
+
+            cur.execute(
+                "UPDATE users SET plan=%s, valid_until=COALESCE(valid_until, %s) WHERE email=%s",
+                (plan, auth_until, email)
+            )
 
             cur.execute(
                 """
@@ -267,12 +350,13 @@ def session_sync():
     return jsonify({
         "success": True,
         "email": email,
-        "plan": user.get("plan"),
+        "plan": plan,
         "auth_until": auth_until,
         "month": month,
         "used": int(usage.get("used") or 0),
         "used_ids": usage.get("used_ids") or []
     })
+
 
 # ----------------------------
 # INIT DB ON IMPORT
