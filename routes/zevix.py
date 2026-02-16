@@ -12,7 +12,6 @@ from datetime import datetime
 DATABASE_URL = os.getenv("DATABASE_URL")
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
-
 # ----------------------------
 # HELPERS
 # ----------------------------
@@ -20,10 +19,11 @@ def normalize_plan(plan):
     p = str(plan or "none").strip().lower()
     return p if p in VALID_PLANS else "none"
 
-
 def default_auth_until_ms():
     return int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
 
+def get_month_key():
+    return datetime.now().strftime("%Y-%m")
 
 # ----------------------------
 # DATABASE CONNECTION
@@ -32,14 +32,14 @@ def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL missing")
 
+    # Render Postgres: sslmode=require
     return psycopg.connect(
         f"{DATABASE_URL}?sslmode=require",
         row_factory=dict_row
     )
 
-
 # ----------------------------
-# INIT DB (lightweight)
+# INIT DB (lightweight + migration safe)
 # ----------------------------
 def init_db():
     with get_conn() as conn:
@@ -56,7 +56,7 @@ def init_db():
                 );
             """)
 
-            # USAGE TABLE (Lead Tracking)
+            # USAGE TABLE
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS usage (
                     id SERIAL PRIMARY KEY,
@@ -68,13 +68,13 @@ def init_db():
                 );
             """)
 
-            # Falls alte Tabelle existiert → Spalte hinzufügen
+            # Migration safety (falls Tabelle schon existierte)
             cur.execute("""
                 ALTER TABLE usage
                 ADD COLUMN IF NOT EXISTS used_ids JSONB DEFAULT '[]'::jsonb
             """)
 
-            # Saubere Defaults für bestehende Nutzer
+            # Defaults für existierende Nutzer
             cur.execute("""
                 UPDATE users
                 SET plan='none'
@@ -83,12 +83,10 @@ def init_db():
 
         conn.commit()
 
-
 # ----------------------------
 # BLUEPRINT
 # ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
-
 
 # ----------------------------
 # REGISTER
@@ -96,12 +94,11 @@ zevix_bp = Blueprint("zevix", __name__)
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
-
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
     if not email or not password:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "missing"}), 400
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -109,8 +106,11 @@ def register():
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO users (email, password) VALUES (%s, %s)",
-                    (email, hashed)   # ✅ DAS KOMMA IST ENTSCHEIDEND
+                    """
+                    INSERT INTO users (email, password, plan, valid_until)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (email, hashed, "none", default_auth_until_ms())
                 )
             conn.commit()
 
@@ -118,7 +118,6 @@ def register():
 
     except psycopg.errors.UniqueViolation:
         return jsonify({"success": False, "message": "exists"}), 400
-
 
 # ----------------------------
 # LOGIN
@@ -130,46 +129,53 @@ def login():
     password = data.get("password") or ""
 
     if not email or not password:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "missing"}), 400
+
+    month = get_month_key()
 
     with get_conn() as conn:
         with conn.cursor() as cur:
 
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
             user = cur.fetchone()
-
             if not user:
-                return jsonify({"success": False}), 404
+                return jsonify({"success": False, "message": "not_found"}), 404
 
             if not bcrypt.checkpw(password.encode(), user["password"].encode()):
-                return jsonify({"success": False}), 401
+                return jsonify({"success": False, "message": "wrong_password"}), 401
 
-            auth_until = user.get("valid_until")
-            if not auth_until:
-                auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
-            auth_until = user.get("valid_until") or default_auth_until_ms()
             plan = normalize_plan(user.get("plan"))
+            auth_until = user.get("valid_until") or default_auth_until_ms()
 
-            # Persistiere saubere Defaults
+            # Persistiere Defaults sauber
             cur.execute(
-                "UPDATE users SET plan=%s, valid_until=COALESCE(valid_until, %s) WHERE email=%s",
+                """
+                UPDATE users
+                SET plan=%s,
+                    valid_until=COALESCE(valid_until, %s)
+                WHERE email=%s
+                """,
                 (plan, auth_until, email)
             )
 
-            month = datetime.now().strftime("%Y-%m")
+            # Usage row sicherstellen
+            cur.execute(
+                """
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
+                ON CONFLICT (user_email, month) DO NOTHING
+                """,
+                (email, month)
+            )
 
-            cur.execute("""
-                INSERT INTO usage (user_email,month,used,used_ids)
-                VALUES (%s,%s,0,'[]'::jsonb)
-                ON CONFLICT (user_email,month) DO NOTHING
-            """, (email, month))
-
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT used, used_ids
                 FROM usage
                 WHERE user_email=%s AND month=%s
-            """, (email, month))
-
+                """,
+                (email, month)
+            )
             usage = cur.fetchone() or {}
             used = int(usage.get("used") or 0)
             used_ids = usage.get("used_ids") or []
@@ -179,7 +185,6 @@ def login():
     return jsonify({
         "success": True,
         "email": email,
-        "plan": user.get("plan"),
         "plan": plan,
         "auth_until": auth_until,
         "month": month,
@@ -187,10 +192,8 @@ def login():
         "used_ids": used_ids
     })
 
-
 # ----------------------------
-# LEAD CONSUMPTION (REAL FIX)
-# SUBSCRIPTION UPDATE (for checkout success pages)
+# SUBSCRIPTION UPDATE (Checkout success)
 # ----------------------------
 @zevix_bp.route("/zevix/update-subscription", methods=["POST"])
 def update_subscription():
@@ -222,10 +225,8 @@ def update_subscription():
                 (plan, auth_until, email)
             )
             updated = cur.fetchone()
-
             if not updated:
                 return jsonify({"success": False, "message": "user_not_found"}), 404
-
         conn.commit()
 
     return jsonify({
@@ -235,9 +236,8 @@ def update_subscription():
         "auth_until": auth_until
     })
 
-
 # ----------------------------
-# LEAD CONSUMPTION
+# LEAD CONSUMPTION (dedupe by lead_ids)
 # ----------------------------
 @zevix_bp.route("/zevix/consume-leads", methods=["POST"])
 def consume_leads():
@@ -246,28 +246,43 @@ def consume_leads():
     lead_ids = data.get("lead_ids") or []
 
     if not email:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "email_missing"}), 400
 
-    month = datetime.now().strftime("%Y-%m")
+    month = get_month_key()
 
-    normalized_ids = [
-        str(i).strip().lower()
-        for i in lead_ids if str(i).strip()
-    ]
+    # normalize incoming ids
+    normalized_ids = []
+    for i in lead_ids:
+        s = str(i).strip().lower()
+        if s:
+            normalized_ids.append(s)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
 
-            cur.execute("""
+            # ensure usage row exists
+            cur.execute(
+                """
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
+                ON CONFLICT (user_email, month) DO NOTHING
+                """,
+                (email, month)
+            )
+
+            cur.execute(
+                """
                 SELECT used, used_ids
                 FROM usage
                 WHERE user_email=%s AND month=%s
-            """, (email, month))
-@@ -192,39 +268,102 @@ def consume_leads():
-                used = int(row.get("used") or 0)
+                """,
+                (email, month)
+            )
+            row = cur.fetchone() or {}
+            used = int(row.get("used") or 0)
+            stored_ids = set(row.get("used_ids") or [])
 
             newly_used = 0
-
             for lid in normalized_ids:
                 if lid not in stored_ids:
                     stored_ids.add(lid)
@@ -275,15 +290,14 @@ def consume_leads():
 
             new_used = used + newly_used
 
-            cur.execute("""
-                INSERT INTO usage (user_email,month,used,used_ids)
-                VALUES (%s,%s,%s,%s::jsonb)
-                ON CONFLICT (user_email,month)
-                DO UPDATE SET used=%s, used_ids=%s::jsonb
-            """, (
-                email, month, new_used, json.dumps(list(stored_ids)),
-                new_used, json.dumps(list(stored_ids))
-            ))
+            cur.execute(
+                """
+                UPDATE usage
+                SET used=%s, used_ids=%s::jsonb
+                WHERE user_email=%s AND month=%s
+                """,
+                (new_used, json.dumps(list(stored_ids)), email, month)
+            )
 
         conn.commit()
 
@@ -295,9 +309,8 @@ def consume_leads():
         "newly_used": newly_used
     })
 
-
 # ----------------------------
-# SESSION SYNC (Dashboard Refresh)
+# SESSION SYNC (Dashboard refresh)
 # ----------------------------
 @zevix_bp.route("/zevix/session-sync", methods=["POST"])
 def session_sync():
@@ -305,31 +318,37 @@ def session_sync():
     email = (data.get("email") or "").strip().lower()
 
     if not email:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "email_missing"}), 400
 
-    month = datetime.now().strftime("%Y-%m")
+    month = get_month_key()
 
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT plan, valid_until FROM users WHERE email=%s", (email,))
             user = cur.fetchone()
-
             if not user:
-                return jsonify({"success": False}), 404
+                return jsonify({"success": False, "message": "not_found"}), 404
 
-            auth_until = user.get("valid_until") or default_auth_until_ms()
             plan = normalize_plan(user.get("plan"))
+            auth_until = user.get("valid_until") or default_auth_until_ms()
 
+            # persist defaults
             cur.execute(
-                "UPDATE users SET plan=%s, valid_until=COALESCE(valid_until, %s) WHERE email=%s",
+                """
+                UPDATE users
+                SET plan=%s,
+                    valid_until=COALESCE(valid_until, %s)
+                WHERE email=%s
+                """,
                 (plan, auth_until, email)
             )
 
+            # ensure usage row exists
             cur.execute(
                 """
-                INSERT INTO usage (user_email,month,used,used_ids)
-                VALUES (%s,%s,0,'[]'::jsonb)
-                ON CONFLICT (user_email,month) DO NOTHING
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
+                ON CONFLICT (user_email, month) DO NOTHING
                 """,
                 (email, month)
             )
@@ -355,7 +374,6 @@ def session_sync():
         "used": int(usage.get("used") or 0),
         "used_ids": usage.get("used_ids") or []
     })
-
 
 # ----------------------------
 # INIT DB ON IMPORT
