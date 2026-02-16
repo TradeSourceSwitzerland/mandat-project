@@ -4,6 +4,7 @@ import psycopg
 from psycopg.rows import dict_row
 import bcrypt
 import stripe
+import jwt
 from flask import Flask, Blueprint, jsonify, request
 from datetime import datetime, timedelta
 
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta
 # ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # Dein Stripe-Secret-Key
+SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Dein geheimen Schlüssel für JWT
 
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
@@ -28,6 +30,15 @@ def default_auth_until_ms():
 def get_month_key():
     return datetime.now().strftime("%Y-%m")
 
+def create_jwt_token(email):
+    expiration = datetime.utcnow() + timedelta(days=30)  # JWT läuft nach 30 Tagen ab
+    payload = {
+        "email": email,
+        "exp": expiration
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    return token
+
 # ----------------------------
 # DATABASE CONNECTION
 # ----------------------------
@@ -43,7 +54,7 @@ def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
             # USERS TABLE
-            cur.execute("""
+            cur.execute(""" 
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email TEXT UNIQUE NOT NULL,
@@ -111,7 +122,7 @@ def register():
         return jsonify({"success": False, "message": "exists"}), 400
 
 # ----------------------------
-# LOGIN
+# LOGIN (JWT Token erstellen und zurückgeben)
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
@@ -173,6 +184,9 @@ def login():
 
         conn.commit()
 
+    # JWT Token erstellen
+    token = create_jwt_token(email)
+
     return jsonify({
         "success": True,
         "email": email,
@@ -180,7 +194,8 @@ def login():
         "auth_until": auth_until,
         "month": month,
         "used": used,
-        "used_ids": used_ids
+        "used_ids": used_ids,
+        "token": token  # Token wird zurückgegeben
     })
 
 # ----------------------------
@@ -209,10 +224,10 @@ def success():
         with get_conn() as conn:
             with conn.cursor() as cur:
                 # 4) Abo in DB aktualisieren
-                cur.execute("""
-                    UPDATE users
-                    SET plan=%s, valid_until=%s
-                    WHERE email=%s
+                cur.execute(""" 
+                    UPDATE users 
+                    SET plan=%s, valid_until=%s 
+                    WHERE email=%s 
                 """, (plan, auth_until, email))
 
             conn.commit()
