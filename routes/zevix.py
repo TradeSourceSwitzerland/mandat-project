@@ -3,13 +3,16 @@ import json
 import psycopg
 from psycopg.rows import dict_row
 import bcrypt
+import stripe
 from flask import Flask, Blueprint, jsonify, request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ----------------------------
 # CONFIG
 # ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # Dein Stripe-Secret-Key
+
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
 # ----------------------------
@@ -20,7 +23,7 @@ def normalize_plan(plan):
     return p if p in VALID_PLANS else "none"
 
 def default_auth_until_ms():
-    return int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
+    return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
 
 def get_month_key():
     return datetime.now().strftime("%Y-%m")
@@ -181,116 +184,43 @@ def login():
     })
 
 # ----------------------------
-# SUBSCRIPTION UPDATE
+# SUCCESS (Stripe Webhook)
 # ----------------------------
-@zevix_bp.route("/zevix/update-subscription", methods=["POST"])
-def update_subscription():
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    plan = (data.get("plan") or "none").strip().lower()
-    auth_until = int(data.get("auth_until") or default_auth_until_ms())
+@zevix_bp.route("/success", methods=["GET"])
+def success():
+    # 1) Parameter aus der URL lesen
+    session_id = request.args.get("session_id")
+    plan = request.args.get("plan")
 
-    if not email:
-        return jsonify({"success": False, "message": "email_missing"}), 400
+    # Sicherheit: ohne session_id nichts tun
+    if not session_id or not plan:
+        return jsonify({"error": "Missing session_id or plan"}), 400
 
-    if plan == "none":
-        return jsonify({"success": False, "message": "invalid_plan"}), 400
+    # 2) Stripe-Session validieren
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status != 'paid':
+            return jsonify({"error": "Payment not successful"}), 400
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE users
-                SET plan=%s, valid_until=%s
-                WHERE lower(email)=lower(%s)
-                RETURNING email
-                """,
-                (plan, auth_until, email)
-            )
-            updated = cur.fetchone()
-            if not updated:
-                return jsonify({"success": False, "message": "user_not_found"}), 404
-        conn.commit()
+        # 3) Abo-Daten aktualisieren
+        email = session.customer_email  # E-Mail des Käufers
+        auth_until = int((datetime.now() + timedelta(days=30)).timestamp() * 1000)  # Setze die Laufzeit auf 30 Tage
 
-    return jsonify({
-        "success": True,
-        "email": email,
-        "plan": plan,
-        "auth_until": auth_until
-    })
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                # 4) Abo in DB aktualisieren
+                cur.execute("""
+                    UPDATE users
+                    SET plan=%s, valid_until=%s
+                    WHERE email=%s
+                """, (plan, auth_until, email))
 
-# ----------------------------
-# SESSION SYNC
-# ----------------------------
-@zevix_bp.route("/zevix/session-sync", methods=["POST"])
-def session_sync():
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
+            conn.commit()
 
-    if not email:
-        return jsonify({"success": False, "message": "email_missing"}), 400
+        return jsonify({"message": "Subscription updated successfully", "plan": plan, "auth_until": auth_until}), 200
 
-    month = get_month_key()
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT plan, valid_until FROM users WHERE lower(email)=lower(%s)", (email,))
-            user = cur.fetchone()
-            if not user:
-                return jsonify({"success": False, "message": "not_found"}), 404
-
-            plan = normalize_plan(user.get("plan"))
-            auth_until = user.get("valid_until") or default_auth_until_ms()
-
-            # persist defaults
-            cur.execute(
-                """
-                UPDATE users
-                SET plan=%s,
-                    valid_until=COALESCE(valid_until, %s)
-                WHERE lower(email)=lower(%s)
-                """,
-                (plan, auth_until, email)
-            )
-
-            # ensure usage row exists
-            cur.execute(
-                """
-                INSERT INTO usage (user_email, month, used, used_ids)
-                VALUES (%s, %s, 0, '[]'::jsonb)
-                ON CONFLICT (user_email, month) DO NOTHING
-                """,
-                (email, month)
-            )
-
-            cur.execute("""
-                UPDATE usage
-                SET used = COALESCE(used, 0),
-                    used_ids = COALESCE(used_ids, '[]'::jsonb)
-                WHERE user_email=%s AND month=%s
-            """, (email, month))
-            
-            cur.execute(
-                """
-                SELECT used, used_ids
-                FROM usage
-                WHERE user_email=%s AND month=%s
-                """,
-                (email, month)
-            )
-            usage = cur.fetchone() or {}
-
-        conn.commit()
-
-    return jsonify({
-        "success": True,
-        "email": email,
-        "plan": plan,
-        "auth_until": auth_until,
-        "month": month,
-        "used": int(usage.get("used") or 0),
-        "used_ids": usage.get("used_ids") or []
-    })
+    except stripe.error.StripeError as e:
+        return jsonify({"error": f"Stripe error: {str(e)}"}), 500
 
 # ----------------------------
 # INIT DB ON IMPORT
