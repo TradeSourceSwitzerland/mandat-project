@@ -4,6 +4,7 @@ import base64
 import smtplib
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
@@ -12,7 +13,11 @@ from email.mime.application import MIMEApplication
 from routes.zevix import zevix_bp
 
 app = Flask(__name__)
-CORS(app)  # 🔥 CORS aktiv für Webflow-Zugriff
+# HTTPS-Information von Reverse-Proxies (z. B. Render) korrekt übernehmen
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Cookies über Cross-Site Requests erlauben (Webflow -> Backend)
+CORS(app, supports_credentials=True)
 # ZEVIX Blueprint registrieren
 app.register_blueprint(zevix_bp)
 # ----------------------------
