@@ -5,21 +5,16 @@ from psycopg.rows import dict_row
 import bcrypt
 import stripe
 import jwt
-from flask import Flask, Blueprint, jsonify, request
+from flask import Flask, Blueprint, jsonify, request, session
 from datetime import datetime, timedelta
 from hmac import compare_digest
 
 # ---------------------------- CONFIG ----------------------------
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key")  # Flask Session Secret
 DATABASE_URL = os.getenv("DATABASE_URL")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # Dein Stripe-Secret-Key
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Dein geheimer Schlüssel für JWT
-
-# Cookie-Verhalten über ENV steuerbar, damit Login lokal und in Prod stabil funktioniert.
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "auto").strip().lower()
-COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "auto").strip().lower()
-COOKIE_DOMAIN = (os.getenv("COOKIE_DOMAIN") or "").strip() or None
-COOKIE_HTTPONLY = os.getenv("COOKIE_HTTPONLY", "false").strip().lower() in {"true", "1", "yes", "on"}
 
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
@@ -35,10 +30,12 @@ def default_auth_until_ms():
 def get_month_key():
     return datetime.now().strftime("%Y-%m")
 
-def create_jwt_token(email):
+def create_jwt_token(email, plan, valid_until):
     expiration = datetime.utcnow() + timedelta(days=30)  # JWT läuft nach 30 Tagen ab
     payload = {
         "email": email,
+        "plan": plan,
+        "valid_until": valid_until,
         "exp": expiration,
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -83,25 +80,6 @@ def verify_password(password, stored_password):
         return bcrypt.checkpw(candidate, stored)
     except ValueError:
         return compare_digest(password or "", stored_password)
-
-def cookie_options():
-    secure = request.is_secure
-    if COOKIE_SECURE in {"true", "1", "yes", "on"}:
-        secure = True
-    elif COOKIE_SECURE in {"false", "0", "no", "off"}:
-        secure = False
-    if COOKIE_SAMESITE in {"lax", "strict", "none"}:
-        samesite = COOKIE_SAMESITE.capitalize()
-    else:
-        samesite = "None" if secure else "Lax"
-    opts = {
-        "secure": secure,
-        "samesite": samesite,
-        "max_age": 30 * 24 * 60 * 60,
-    }
-    if COOKIE_DOMAIN:
-        opts["domain"] = COOKIE_DOMAIN
-    return opts
 
 def get_conn():
     if not DATABASE_URL:
@@ -159,7 +137,7 @@ def login():
             if not verify_password(password, user.get("password")):
                 return jsonify({"success": False, "message": "wrong_password"}), 401
 
-    # Hier kombinieren wir Plan- und Verbrauchsdaten
+    # Holen der Plan- und Verbrauchsdaten
     month = get_month_key()
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -167,14 +145,14 @@ def login():
                 """
                 SELECT plan, valid_until FROM users WHERE email=%s
                 """,
-                (email, )
+                (email,)
             )
             user_data = cur.fetchone()
 
             plan = user_data["plan"]
             valid_until = user_data["valid_until"] or default_auth_until_ms()
 
-            # Leads-Verbrauch in der gleichen Funktion aktualisieren, wenn der Plan geändert wurde
+            # Leads-Verbrauch in der gleichen Funktion aktualisieren
             cur.execute(
                 """
                 INSERT INTO usage (user_email, month, used, used_ids)
@@ -198,16 +176,17 @@ def login():
 
         conn.commit()
 
-    # JWT-Token erstellen
-    token = create_jwt_token(email)
+    # JWT-Token erstellen und in der Session speichern
+    token = create_jwt_token(email, plan, valid_until)
 
     response = jsonify({"success": True, "plan": plan, "valid_until": valid_until, "used": used, "used_ids": used_ids, "token": token})
 
-    cookie_cfg = cookie_options()
-
-    response.set_cookie("auth_token", token, httponly=COOKIE_HTTPONLY, **cookie_cfg)
-    response.set_cookie("zevix_email", email, **cookie_cfg)
-    response.set_cookie("plan", plan, **cookie_cfg)
+    # Speichern der Session-Daten in Flask Session (nicht in Cookies)
+    session["auth_token"] = token
+    session["email"] = email
+    session["plan"] = plan
+    session["used"] = used
+    session["used_ids"] = used_ids
 
     return response
 
@@ -228,9 +207,9 @@ def stripe_webhook():
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         email = session["customer_email"]
-        plan = session["metadata"]["plan"]  # Hier den Plan aus den Metadaten entnehmen
+        plan = session["metadata"]["plan"]  # Den Plan aus den Metadaten holen
 
-        # Vorherigen Plan holen, um zu überprüfen, ob er sich geändert hat
+        # Vorherigen Plan abrufen, um zu prüfen, ob er sich geändert hat
         with get_conn() as conn:
             with conn.cursor() as cur:
                 # Vorherigen Plan abrufen
@@ -244,7 +223,7 @@ def stripe_webhook():
 
                 # Wenn der Plan sich geändert hat, den Verbrauch zurücksetzen
                 if old_plan != plan:
-                    # Verbrauch zurücksetzen
+                    # Leads-Verbrauch zurücksetzen, wenn sich der Plan geändert hat
                     cur.execute(
                         """
                         UPDATE usage
@@ -265,11 +244,11 @@ def stripe_webhook():
                 )
                 conn.commit()
 
-        # Cookie für den Plan setzen
-        response = jsonify(success=True)
-        cookie_cfg = cookie_options()
+        # JWT-Token erstellen und zurückgeben
+        token = create_jwt_token(email, plan, default_auth_until_ms())
 
-        response.set_cookie("plan", plan, **cookie_cfg)
+        response = jsonify(success=True)
+        response.set_cookie("plan", plan)
 
         return response
 
