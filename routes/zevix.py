@@ -55,19 +55,12 @@ def load_all_leads():
             print(f"Reading file: {f}")
 
             # Versuch 1: normal lesen
-            df = pd.read_excel(f)
+            df = pd.read_excel(f, engine="openpyxl")
 
-            # Wenn leer → typische SHAB Struktur (Header später)
+            # falls mehrere Sheets existieren → erstes nehmen
             if df.empty:
-                df = pd.read_excel(f, header=2)
-
-            # Wenn immer noch leer → alle Sheets testen
-            if df.empty:
-                xls = pd.ExcelFile(f)
-                for sheet in xls.sheet_names:
-                    df = pd.read_excel(xls, sheet_name=sheet, header=2)
-                    if not df.empty:
-                        break
+                xls = pd.ExcelFile(f, engine="openpyxl")
+                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], engine="openpyxl")
 
             print(f"Loaded rows: {len(df)}")
 
