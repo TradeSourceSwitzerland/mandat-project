@@ -346,10 +346,18 @@ def verify_session():
             session_status,
         )
         return jsonify(success=False, message="payment_not_completed"), 409
-
+    # Session ist abgeschlossen (oder bezahlt): Plan-Update versuchen,
+    # aber bei bekannten Race-Conditions nicht in einen Reload-Loop zwingen.
     updated, message = apply_checkout_result_to_user(checkout_session)
     if not updated:
         logging.warning("User-Update fehlgeschlagen, session_id=%s, message=%s", session_id, message)
+        if message in {"missing_customer_email", "user_not_found"}:
+            logging.info(
+                "Checkout abgeschlossen, aber Sync noch ausstehend; Dashboard-Redirect erlaubt: session_id=%s",
+                session_id,
+            )
+            return jsonify(success=True, message="sync_pending")
+            
         status_code = 404 if message == "user_not_found" else 400
         return jsonify(success=False, message=message), status_code
 
