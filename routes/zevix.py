@@ -248,3 +248,20 @@ def export(email):
     df_export.to_excel(tmp.name, index=False)
 
     return send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
+
+# ----------------------------
+# LEAD STATS (für Dashboard)
+# ----------------------------
+
+@zevix_bp.route("/zevix/stats", methods=["GET"])
+def stats():
+    try:
+        df = load_all_leads()
+        total = len(df)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    return jsonify({
+        "success": True,
+        "total_leads": int(total)
+    })
