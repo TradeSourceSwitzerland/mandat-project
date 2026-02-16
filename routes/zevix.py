@@ -1,8 +1,3 @@
-diff --git a/routes/zevix.py b/routes/zevix.py
-index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be6a9d591b 100644
---- a/routes/zevix.py
-+++ b/routes/zevix.py
-@@ -1,66 +1,128 @@
  import os
  import json
  import psycopg
@@ -10,7 +5,6 @@ index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be
  import bcrypt
  import stripe
  import jwt
--from flask import Flask, Blueprint, jsonify, request, make_response
 +from flask import Blueprint, jsonify, request
  from datetime import datetime, timedelta
  
@@ -157,12 +151,9 @@ index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be
  
      if not email or not password:
          return jsonify({"success": False, "message": "missing"}), 400
- 
--    month = get_month_key()
--
+
      with get_conn() as conn:
          with conn.cursor() as cur:
--
              cur.execute("SELECT * FROM users WHERE email=%s", (email,))
              user = cur.fetchone()
              if not user:
@@ -171,43 +162,6 @@ index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be
              if not bcrypt.checkpw(password.encode(), user["password"].encode()):
                  return jsonify({"success": False, "message": "wrong_password"}), 401
  
--            plan = normalize_plan(user.get("plan"))
--            auth_until = user.get("valid_until") or default_auth_until_ms()
--
--            # Persistiere Defaults sauber
--            cur.execute(
--                """
--                UPDATE users
--                SET plan=%s,
--                    valid_until=COALESCE(valid_until, %s)
--                WHERE email=%s
--                """,
--                (plan, auth_until, email)
--            )
--
--            # Usage row sicherstellen
--            cur.execute(
--                """
--                INSERT INTO usage (user_email, month, used, used_ids)
--                VALUES (%s, %s, 0, '[]'::jsonb)
--                ON CONFLICT (user_email, month) DO NOTHING
--                """,
--                (email, month)
--            )
--
--            cur.execute(
--                """
--                SELECT used, used_ids
--                FROM usage
--                WHERE user_email=%s AND month=%s
--                """,
--                (email, month)
--            )
--            usage = cur.fetchone() or {}
--            used = int(usage.get("used") or 0)
--            used_ids = usage.get("used_ids") or []
--
--        conn.commit()
 +    session = load_user_session(email)
 +    if not session:
 +        return jsonify({"success": False, "message": "not_found"}), 404
@@ -218,18 +172,11 @@ index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be
      # Erstelle ein Antwortobjekt mit Cookie
      response = jsonify({
          "success": True,
--        "email": email,
--        "plan": plan,
--        "auth_until": auth_until,
--        "month": month,
--        "used": used,
--        "used_ids": used_ids,
 +        **session,
          "token": token
      })
  
      # JWT als Cookie setzen (HttpOnly und Secure)
--    response.set_cookie("auth_token", token, httponly=True, secure=True, max_age=30*24*60*60)  # 30 Tage
 +    response.set_cookie("auth_token", token, httponly=True, secure=True, samesite="Lax", max_age=30*24*60*60)  # 30 Tage
 +    # UI-Cookies für bestehende Webflow-Embeds
 +    response.set_cookie("zevix_email", session["email"], secure=True, samesite="Lax", max_age=30*24*60*60)
@@ -285,4 +232,4 @@ index e9d6ceaa5cec9d8618d6f777f78c0e48c09b365c..e5858da916fc9240b82b9afe55eff2be
          with get_conn() as conn:
              with conn.cursor() as cur:
                  cur.execute(""" 
-                     UPDATE users 
+                     UPDATE users
