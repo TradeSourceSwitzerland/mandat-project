@@ -113,8 +113,8 @@ def cookie_options():
     return {
         "secure": secure,
         "samesite": samesite,
-        "domain": "www.zevix.ch",  # Setze die Domain explizit
         "max_age": 30 * 24 * 60 * 60,
+        "domain": "www.zevix.ch"  # Setze die Domain explizit
     }
 
 
@@ -239,38 +239,6 @@ zevix_bp = Blueprint("zevix", __name__)
 
 
 # ----------------------------
-# REGISTER
-# ----------------------------
-@zevix_bp.route("/zevix/register", methods=["POST"])
-def register():
-    data = request_payload()
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"success": False, "message": "missing"}), 400
-
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO users (email, password, plan, valid_until)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (email, hashed, "none", default_auth_until_ms()),
-                )
-            conn.commit()
-
-        return jsonify({"success": True})
-
-    except psycopg.errors.UniqueViolation:
-        return jsonify({"success": False, "message": "exists"}), 400
-
-
-# ----------------------------
 # LOGIN (JWT Token erstellen und zurückgeben)
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
@@ -320,113 +288,10 @@ def login():
         "auth_token",
         token,
         httponly=True,
-        **cookie_cfg,
-    )  # 30 Tage
-    print("Cookie gesetzt: auth_token")  # Debugging-Ausgabe
-
-    # UI-Cookies für bestehende Webflow-Embeds
-    response.set_cookie(
-        "zevix_email",
-        session["email"],
-        **cookie_cfg,
-    )
-    response.set_cookie(
-        "plan",
-        session["plan"],
-        **cookie_cfg,
+        secure=True,   # Nur, wenn HTTPS verwendet wird
+        samesite="None",  # Falls SameSite=None gebraucht wird
+        max_age=2592000,  # 30 Tage
+        domain="www.zevix.ch",  # Sicherstellen, dass der Cookie auf der richtigen Domain gesetzt wird
     )
 
     return response
-
-
-@zevix_bp.route("/zevix/session-sync", methods=["POST"])
-def session_sync():
-    data = request_payload()
-    token = (data.get("token") or "").strip()
-    email = (data.get("email") or "").strip().lower()
-
-    if token:
-        try:
-            payload = decode_jwt_token(token)
-            email = (payload.get("email") or "").strip().lower()
-        except jwt.PyJWTError:
-            return jsonify({"success": False, "message": "invalid_token"}), 401
-
-    if not email:
-        return jsonify({"success": False, "message": "missing_identity"}), 400
-
-    session = load_user_session(email)
-    if not session:
-        return jsonify({"success": False, "message": "not_found"}), 404
-
-    response = jsonify({"success": True, **session})
-    cookie_cfg = cookie_options()
-    response.set_cookie(
-        "zevix_email",
-        session["email"],
-        **cookie_cfg,
-    )
-    response.set_cookie(
-        "plan",
-        session["plan"],
-        **cookie_cfg,
-    )
-    return response
-
-
-# ----------------------------
-# SUCCESS (Stripe Webhook)
-# ----------------------------
-@zevix_bp.route("/success", methods=["GET"])
-def success():
-    session_id = request.args.get("session_id")
-    plan = request.args.get("plan")
-
-    if not session_id or not plan:
-        return jsonify({"error": "Missing session_id or plan"}), 400
-
-    try:
-        session = stripe.checkout.Session.retrieve(session_id)
-        if session.payment_status != "paid":
-            return jsonify({"error": "Payment not successful"}), 400
-
-        email = session.customer_email
-        auth_until = int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE users
-                    SET plan=%s, valid_until=%s
-                    WHERE email=%s
-                    """,
-                    (plan, auth_until, email),
-                )
-
-            conn.commit()
-
-        return (
-            jsonify(
-                {
-                    "message": "Subscription updated successfully",
-                    "plan": plan,
-                    "auth_until": auth_until,
-                }
-            ),
-            200,
-        )
-
-    except stripe.error.StripeError as e:
-        return jsonify({"error": f"Stripe error: {str(e)}"}), 500
-
-
-# ----------------------------
-# INIT DB ON IMPORT
-# ----------------------------
-try:
-    print("Initializing ZEVIX DB...")
-    init_db()
-    print("DB ready")
-except Exception as e:
-    print("DB INIT FAILED:", e)
