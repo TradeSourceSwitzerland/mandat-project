@@ -167,14 +167,14 @@ def login():
                 """
                 SELECT plan, valid_until FROM users WHERE email=%s
                 """,
-                (email,)
+                (email, )
             )
             user_data = cur.fetchone()
 
             plan = user_data["plan"]
             valid_until = user_data["valid_until"] or default_auth_until_ms()
 
-            # Leads-Verbrauch in der gleichen Funktion aktualisieren
+            # Leads-Verbrauch in der gleichen Funktion aktualisieren, wenn der Plan geändert wurde
             cur.execute(
                 """
                 INSERT INTO usage (user_email, month, used, used_ids)
@@ -230,9 +230,31 @@ def stripe_webhook():
         email = session["customer_email"]
         plan = session["metadata"]["plan"]  # Hier den Plan aus den Metadaten entnehmen
 
-        # Plan in der Datenbank aktualisieren
+        # Vorherigen Plan holen, um zu überprüfen, ob er sich geändert hat
         with get_conn() as conn:
             with conn.cursor() as cur:
+                # Vorherigen Plan abrufen
+                cur.execute(
+                    """
+                    SELECT plan FROM users WHERE email=%s
+                    """,
+                    (email,)
+                )
+                old_plan = cur.fetchone()["plan"]
+
+                # Wenn der Plan sich geändert hat, den Verbrauch zurücksetzen
+                if old_plan != plan:
+                    # Verbrauch zurücksetzen
+                    cur.execute(
+                        """
+                        UPDATE usage
+                        SET used = 0, used_ids = '[]'::jsonb
+                        WHERE user_email=%s
+                        """,
+                        (email,)
+                    )
+
+                # Plan in der Datenbank aktualisieren
                 cur.execute(
                     """
                     UPDATE users
@@ -240,17 +262,6 @@ def stripe_webhook():
                     WHERE email=%s
                     """,
                     (plan, email),
-                )
-                conn.commit()
-
-                # Leads-Verbrauch zurücksetzen
-                cur.execute(
-                    """
-                    UPDATE usage
-                    SET used = 0, used_ids = '[]'::jsonb
-                    WHERE user_email=%s
-                    """,
-                    (email,)
                 )
                 conn.commit()
 
