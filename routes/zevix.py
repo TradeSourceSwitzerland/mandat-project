@@ -26,14 +26,11 @@ def normalize_plan(plan: str | None) -> str:
     value = str(plan or "none").strip().lower()
     return value if value in VALID_PLANS else "none"
 
-
 def default_auth_until_ms() -> int:
     return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
 
-
 def get_month_key() -> str:
     return datetime.now().strftime("%Y-%m")
-
 
 def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
     expiration = datetime.utcnow() + timedelta(days=30)
@@ -45,7 +42,6 @@ def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
-
 def request_payload() -> dict:
     data = request.get_json(silent=True)
     if isinstance(data, dict):
@@ -54,12 +50,10 @@ def request_payload() -> dict:
         return request.form.to_dict(flat=True)
     return {}
 
-
 def resolve_session_id(data: dict) -> str:
     payload_session_id = str(data.get("session_id") or "").strip()
     query_session_id = str(request.args.get("session_id") or "").strip()
     return payload_session_id or query_session_id
-
 
 def find_user_by_email(cur, email: str) -> dict | None:
     cur.execute(
@@ -74,7 +68,6 @@ def find_user_by_email(cur, email: str) -> dict | None:
     )
     return cur.fetchone()
 
-
 def verify_password(password: str, stored_password: str | None) -> bool:
     if not stored_password:
         return False
@@ -85,12 +78,10 @@ def verify_password(password: str, stored_password: str | None) -> bool:
     except ValueError:
         return compare_digest(password or "", stored_password)
 
-
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL fehlt")
     return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
-
 
 def configured_price_plan_map() -> dict[str, str]:
     mapping = dict(DEFAULT_PLAN_BY_PRICE_ID)
@@ -107,14 +98,12 @@ def configured_price_plan_map() -> dict[str, str]:
             mapping[price_id] = plan
     return mapping
 
-
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     email = (checkout_session.get("customer_email") or "").strip().lower()
     if email:
         return email
     customer_details = checkout_session.get("customer_details") or {}
     return str(customer_details.get("email") or "").strip().lower()
-
 
 def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
     email = resolve_email_from_checkout_session(checkout_session)
@@ -157,7 +146,6 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
 
     return True, "ok"
 
-
 def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     # 1) bevorzugt metadata.plan
     metadata_plan = normalize_plan((checkout_session.get("metadata") or {}).get("plan"))
@@ -190,119 +178,8 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
 
     return "none"
 
-
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
-
-# ---------------------------- REGISTER ----------------------------
-@zevix_bp.route("/zevix/register", methods=["POST"])
-def register():
-    data = request_payload()
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"success": False, "message": "missing"}), 400
-
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO users (email, password, plan, valid_until)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (email, hashed, "none", default_auth_until_ms()),
-                )
-            conn.commit()
-        return jsonify({"success": True})
-    except psycopg.errors.UniqueViolation:
-        return jsonify({"success": False, "message": "exists"}), 400
-
-
-# ---------------------------- LOGIN ----------------------------
-@zevix_bp.route("/zevix/login", methods=["POST"])
-def login():
-    data = request_payload()
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"success": False, "message": "missing"}), 400
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            user = find_user_by_email(cur, email)
-            if not user:
-                return jsonify({"success": False, "message": "not_found"}), 404
-            if not verify_password(password, user.get("password")):
-                return jsonify({"success": False, "message": "wrong_password"}), 401
-
-    month = get_month_key()
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT plan, valid_until
-                FROM users
-                WHERE lower(email)=%s
-                """,
-                (email,),
-            )
-            user_data = cur.fetchone() or {}
-
-            plan = normalize_plan(user_data.get("plan"))
-            valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
-
-            cur.execute(
-                """
-                INSERT INTO usage (user_email, month, used, used_ids)
-                VALUES (%s, %s, 0, '[]'::jsonb)
-                ON CONFLICT (user_email, month) DO NOTHING
-                """,
-                (email, month),
-            )
-
-            cur.execute(
-                """
-                SELECT used, used_ids
-                FROM usage
-                WHERE user_email=%s AND month=%s
-                """,
-                (email, month),
-            )
-            usage = cur.fetchone() or {}
-            used = int(usage.get("used") or 0)
-            used_ids = usage.get("used_ids") or []
-        conn.commit()
-
-    token = create_jwt_token(email, plan, valid_until)
-
-    response = jsonify(
-        {
-            "success": True,
-            "email": email,
-            "plan": plan,
-            "valid_until": valid_until,
-            # Frontend-Kompatibilität (bestehendes Webflow-Script erwartet auth_until)
-            "auth_until": valid_until,
-            "month": month,
-            "used": used,
-            "used_ids": used_ids,
-            "token": token,
-        }
-    )
-
-    session["auth_token"] = token
-    session["email"] = email
-    session["plan"] = plan
-    session["used"] = used
-    session["used_ids"] = used_ids
-
-    return response
-
 
 # ---------------------------- VERIFY SESSION ----------------------------
 @zevix_bp.route("/zevix/verify-session", methods=["POST"])
