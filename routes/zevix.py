@@ -45,10 +45,20 @@ def create_jwt_token(email):
         "exp": expiration,
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    print(f"JWT-Token erstellt: {token}")  # Debugging-Ausgabe
     return token
 
+
 def decode_jwt_token(token):
-    return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        print(f"Token dekodiert: {payload}")  # Protokolliere den dekodierten Token
+        return payload
+    except jwt.ExpiredSignatureError:
+        print("Token abgelaufen!")
+    except jwt.InvalidTokenError:
+        print("Ungültiges Token!")
+
 
 def request_payload():
     data = request.get_json(silent=True)
@@ -106,12 +116,14 @@ def cookie_options():
         "max_age": 30 * 24 * 60 * 60,
     }
 
+
 def load_user_session(email):
     month = get_month_key()
 
     with get_conn() as conn:
         with conn.cursor() as cur:
             user = find_user_by_email(cur, email)
+            print(f"Benutzer gefunden: {user}")  # Debugging-Ausgabe
             if not user:
                 return None
 
@@ -170,7 +182,7 @@ def load_user_session(email):
 # ----------------------------
 def get_conn():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL missing")
+        raise RuntimeError("DATABASE_URL fehlt")
     return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
 
 
@@ -294,6 +306,9 @@ def login():
     # JWT Token erstellen
     token = create_jwt_token(email)
 
+    # Debugging-Ausgabe
+    print(f"Token für {email}: {token}")
+
     # Erstelle ein Antwortobjekt mit Cookie
     response = jsonify({"success": True, **session, "token": token})
 
@@ -306,6 +321,8 @@ def login():
         httponly=True,
         **cookie_cfg,
     )  # 30 Tage
+    print("Cookie gesetzt: auth_token")  # Debugging-Ausgabe
+
     # UI-Cookies für bestehende Webflow-Embeds
     response.set_cookie(
         "zevix_email",
