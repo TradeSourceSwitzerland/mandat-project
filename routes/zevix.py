@@ -96,6 +96,7 @@ zevix_bp = Blueprint("zevix", __name__)
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
+
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
@@ -108,10 +109,8 @@ def register():
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO users (email,password) VALUES (%s,%s)",
-                    (email, hashed)
-                    "INSERT INTO users (email,password,plan) VALUES (%s,%s,%s)",
-                    (email, hashed, "none")
+                    "INSERT INTO users (email, password) VALUES (%s, %s)",
+                    (email, hashed)   # ✅ DAS KOMMA IST ENTSCHEIDEND
                 )
             conn.commit()
 
