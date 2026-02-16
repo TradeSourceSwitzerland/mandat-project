@@ -33,7 +33,6 @@ def get_conn():
 # ----------------------------
 
 def load_all_leads():
-    # gehe vom routes/ Ordner zurück ins Projekt-Root
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_dir = os.path.join(project_root, "data")
 
@@ -49,9 +48,43 @@ def load_all_leads():
     if not files:
         raise RuntimeError("No Excel files inside /data")
 
-    dfs = [pd.read_excel(f) for f in files]
-    return pd.concat(dfs, ignore_index=True)
+    dfs = []
 
+    for f in files:
+        try:
+            print(f"Reading file: {f}")
+
+            # Versuch 1: normal lesen
+            df = pd.read_excel(f)
+
+            # Wenn leer → typische SHAB Struktur (Header später)
+            if df.empty:
+                df = pd.read_excel(f, header=2)
+
+            # Wenn immer noch leer → alle Sheets testen
+            if df.empty:
+                xls = pd.ExcelFile(f)
+                for sheet in xls.sheet_names:
+                    df = pd.read_excel(xls, sheet_name=sheet, header=2)
+                    if not df.empty:
+                        break
+
+            print(f"Loaded rows: {len(df)}")
+
+            if not df.empty:
+                dfs.append(df)
+
+        except Exception as e:
+            print(f"Error reading {f}: {e}")
+
+    if not dfs:
+        print("⚠️ No data extracted from Excel files")
+        return pd.DataFrame()
+
+    combined = pd.concat(dfs, ignore_index=True)
+    print(f"TOTAL LEADS LOADED: {len(combined)}")
+
+    return combined
 
 # ----------------------------
 # INIT DB (Render-safe lazy init)
