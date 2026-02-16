@@ -337,6 +337,15 @@ def verify_session():
             payment_status,
             session_status,
         )
+        # Für kostenfreie bzw. Trial-Checkouts trotzdem versuchen, den Plan sofort zu synchronisieren.
+        updated, message = apply_checkout_result_to_user(checkout_session)
+        if not updated:
+            logging.warning(
+                "Trial-/Free-Session konnte nicht vollständig synchronisiert werden, session_id=%s, message=%s",
+                session_id,
+                message,
+            )
+        # Bestehende Frontend-Kompatibilität: Antwort als Erfolg signalisieren.
         return jsonify(success=True, message="in_trial_or_free")
 
     if payment_status != "paid" and session_status != "complete":
