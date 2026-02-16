@@ -19,6 +19,19 @@ def normalize_plan(plan):
     p = str(plan or "none").strip().lower()
     return p if p in VALID_PLANS else "none"
 
+def extract_plan(data):
+    """Unterstützt alte/neue Payload-Feldnamen für das Abo."""
+    return normalize_plan(
+        data.get("plan")
+        or data.get("abo")
+        or data.get("subscription")
+        or data.get("tier")
+    )
+
+def extract_auth_until(data):
+    """Unterstützt alternative Feldnamen für Laufzeit."""
+    return data.get("auth_until", data.get("valid_until"))
+
 def default_auth_until_ms():
     return int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
 
@@ -213,8 +226,8 @@ def login():
 def update_subscription():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
-    plan = normalize_plan(data.get("plan"))
-    auth_until = data.get("auth_until")
+    plan = extract_plan(data)
+    auth_until = extract_auth_until(data)
 
     if not email:
         return jsonify({"success": False, "message": "email_missing"}), 400
@@ -233,7 +246,7 @@ def update_subscription():
                 """
                 UPDATE users
                 SET plan=%s, valid_until=%s
-                WHERE email=%s
+                WHERE lower(email)=lower(%s)
                 RETURNING email
                 """,
                 (plan, auth_until, email)
@@ -257,7 +270,20 @@ def update_subscription():
 def consume_leads():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
-    lead_ids = data.get("lead_ids") or []
+    lead_ids = data.get("lead_ids")
+    if lead_ids is None:
+        lead_ids = data.get("ids")
+    if lead_ids is None and data.get("lead_id") is not None:
+        lead_ids = [data.get("lead_id")]
+    if lead_ids is None:
+        lead_ids = []
+
+    # Fallback: Einige Clients senden nur eine Anzahl statt IDs.
+    count_hint = data.get("count", data.get("used", data.get("verbrauch", 0)))
+    try:
+        count_hint = max(0, int(count_hint or 0))
+    except (TypeError, ValueError):
+        count_hint = 0
 
     if not email:
         return jsonify({"success": False, "message": "email_missing"}), 400
@@ -275,7 +301,7 @@ def consume_leads():
         with conn.cursor() as cur:
 
             # --- USER + PLAN LADEN ---
-            cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+            cur.execute("SELECT plan FROM users WHERE lower(email)=lower(%s)", (email,))
             user = cur.fetchone()
             if not user:
                 return jsonify({"success": False, "message": "user_not_found"}), 404
@@ -314,6 +340,11 @@ def consume_leads():
                         break  # LIMIT ERREICHT
                     stored_ids.add(lid)
                     newly_used += 1
+                    
+            # Falls keine IDs gesendet wurden, können wir trotzdem den Verbrauch erhöhen.
+            if not normalized_ids and count_hint > 0:
+                remaining = max(0, limit - (used + newly_used))
+                newly_used += min(count_hint, remaining)
 
             new_used = used + newly_used
 
@@ -328,6 +359,7 @@ def consume_leads():
 
     return jsonify({
         "success": True,
+        "plan": plan,  # ← DAS FEHLTE!
         "month": month,
         "used": new_used,
         "used_ids": list(stored_ids),
