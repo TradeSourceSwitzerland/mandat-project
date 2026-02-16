@@ -4,85 +4,28 @@ from psycopg.rows import dict_row
 import bcrypt
 from flask import Blueprint, jsonify, request, send_file
 from datetime import datetime
-import pandas as pd
-import tempfile
 
 # ----------------------------
 # CONFIG
 # ----------------------------
-
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 
 # ----------------------------
 # DATABASE CONNECTION
 # ----------------------------
-
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL missing")
 
+    # Render Postgres: SSL required
     return psycopg.connect(
         f"{DATABASE_URL}?sslmode=require",
         row_factory=dict_row
     )
 
-
 # ----------------------------
-# LOAD LOCAL EXCEL FILES
+# INIT DB (safe, lightweight)
 # ----------------------------
-
-def load_all_leads():
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_dir = os.path.join(project_root, "data")
-
-    if not os.path.exists(data_dir):
-        raise RuntimeError(f"/data folder missing at {data_dir}")
-
-    files = [
-        os.path.join(data_dir, f)
-        for f in os.listdir(data_dir)
-        if f.endswith(".xlsx")
-    ]
-
-    if not files:
-        raise RuntimeError("No Excel files inside /data")
-
-    dfs = []
-
-    for f in files:
-        try:
-            print(f"Reading file: {f}")
-
-            # Versuch 1: normal lesen
-            df = pd.read_excel(f, engine="openpyxl")
-
-            # falls mehrere Sheets existieren → erstes nehmen
-            if df.empty:
-                xls = pd.ExcelFile(f, engine="openpyxl")
-                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], engine="openpyxl")
-
-            print(f"Loaded rows: {len(df)}")
-
-            if not df.empty:
-                dfs.append(df)
-
-        except Exception as e:
-            print(f"Error reading {f}: {e}")
-
-    if not dfs:
-        print("⚠️ No data extracted from Excel files")
-        return pd.DataFrame()
-
-    combined = pd.concat(dfs, ignore_index=True)
-    print(f"TOTAL LEADS LOADED: {len(combined)}")
-
-    return combined
-
-# ----------------------------
-# INIT DB (Render-safe lazy init)
-# ----------------------------
-
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
@@ -111,56 +54,54 @@ def init_db():
     cur.close()
     conn.close()
 
-
 # ----------------------------
 # BLUEPRINT
 # ----------------------------
-
 zevix_bp = Blueprint("zevix", __name__)
-
 
 # ----------------------------
 # REGISTER
 # ----------------------------
-
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
 
     if not email or not password:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "missing_fields"}), 400
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     conn = get_conn()
     cur = conn.cursor()
 
     try:
+        # plan/valid_until bleiben erstmal NULL
         cur.execute(
             "INSERT INTO users (email,password,plan,valid_until) VALUES (%s,%s,NULL,NULL)",
             (email, hashed)
         )
         conn.commit()
+        return jsonify({"success": True})
     except psycopg.errors.UniqueViolation:
-        return jsonify({"success": False, "message": "User exists"}), 400
+        conn.rollback()
+        return jsonify({"success": False, "message": "user_exists"}), 400
     finally:
         cur.close()
         conn.close()
 
-    return jsonify({"success": True})
-
-
 # ----------------------------
 # LOGIN
 # ----------------------------
-
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"success": False, "message": "missing_fields"}), 400
 
     conn = get_conn()
     cur = conn.cursor()
@@ -169,16 +110,19 @@ def login():
     user = cur.fetchone()
 
     if not user:
-        return jsonify({"success": False}), 404
+        cur.close(); conn.close()
+        return jsonify({"success": False, "message": "not_found"}), 404
 
-    if not bcrypt.checkpw(password.encode(), user["password"].encode()):
-        return jsonify({"success": False}), 401
+    if not bcrypt.checkpw(password.encode("utf-8"), user["password"].encode("utf-8")):
+        cur.close(); conn.close()
+        return jsonify({"success": False, "message": "wrong_password"}), 401
 
-    plan = user["plan"]
+    plan = user.get("plan")  # kann None sein
+    auth_until = user.get("valid_until")
 
-    auth_until = user["valid_until"]
+    # fallback: 30 Tage Session
     if not auth_until:
-        auth_until = int((datetime.now().timestamp() + 30*24*60*60) * 1000)
+        auth_until = int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
 
     month = datetime.now().strftime("%Y-%m")
 
@@ -193,7 +137,8 @@ def login():
         "SELECT used FROM usage WHERE user_email=%s AND month=%s",
         (email, month)
     )
-    used = cur.fetchone()["used"]
+    row = cur.fetchone()
+    used = row["used"] if row else 0
 
     conn.commit()
     cur.close()
@@ -208,19 +153,12 @@ def login():
         "used": used
     })
 
-
 # ----------------------------
-# EXPORT LEADS (Abo Pflicht)
+# EXPORT LEADS (STREAM XLSX ONLY - NO PANDAS!)
 # ----------------------------
-
-PLAN_LIMITS = {
-    "basic": 500,
-    "business": 1000,
-    "enterprise": 4500
-}
-
-@zevix_bp.route("/zevix/export/<email>", methods=["GET"])
+@zevix_bp.route("/zevix/export/<path:email>", methods=["GET"])
 def export(email):
+    email = (email or "").strip().lower()
 
     conn = get_conn()
     cur = conn.cursor()
@@ -228,69 +166,46 @@ def export(email):
     cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
-    if not user or not user["plan"]:
+    if not user or not user.get("plan"):
+        cur.close(); conn.close()
         return jsonify({"success": False, "message": "no_subscription"}), 403
 
-    plan = user["plan"]
-    monthly_limit = PLAN_LIMITS.get(plan, 500)
+    # ✅ KEIN Excel lesen, KEIN RAM, nur Datei streamen
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(project_root, "data")
 
-    month = datetime.now().strftime("%Y-%m")
+    if not os.path.exists(data_dir):
+        cur.close(); conn.close()
+        return jsonify({"success": False, "error": "data_folder_missing"}), 500
 
-    cur.execute("""
-        SELECT used FROM usage WHERE user_email=%s AND month=%s
-    """, (email, month))
-    result = cur.fetchone()
+    files = sorted([f for f in os.listdir(data_dir) if f.lower().endswith(".xlsx")])
 
-    used = result["used"] if result else 0
+    if not files:
+        cur.close(); conn.close()
+        return jsonify({"success": False, "error": "no_excel_files"}), 500
 
-    if used >= monthly_limit:
-        return jsonify({"success": False, "message": "limit_reached"}), 403
+    # wenn du mehrere Files hast: nimm das erste (oder ändere Logik)
+    file_path = os.path.join(data_dir, files[0])
 
-
-    # 🔐 LOAD LOCAL DATA (SECURE)
-    df = load_all_leads()
-
-    df_export = df.sample(min(50, len(df)))
-
-    cur.execute("""
-        UPDATE usage SET used = used + %s
-        WHERE user_email=%s AND month=%s
-    """, (len(df_export), email, month))
-
-    conn.commit()
     cur.close()
     conn.close()
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    df_export.to_excel(tmp.name, index=False)
-
-    return send_file(tmp.name, as_attachment=True, download_name="leads.xlsx")
+    # Browser lädt XLSX und filtert selbst
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name="leads.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ----------------------------
-# LEAD STATS (für Dashboard)
+# TEMP DB MIGRATION (RUN ONCE THEN DELETE)
 # ----------------------------
-
-@zevix_bp.route("/zevix/stats", methods=["GET"])
-def stats():
-    try:
-        df = load_all_leads()
-        total = len(df)
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-    return jsonify({
-        "success": True,
-        "total_leads": int(total)
-    })
-
-# 🔥 TEMP DB MIGRATION (RUN ONCE THEN DELETE)
 @zevix_bp.route("/__fix_db_once")
 def fix_db_once():
+    conn = get_conn()
+    cur = conn.cursor()
     try:
-        conn = get_conn()   # ✅ richtige Funktion!
-        cur = conn.cursor()
-
-        # Prüfen ob Spalte existiert
         cur.execute("""
             SELECT column_name
             FROM information_schema.columns
@@ -301,23 +216,23 @@ def fix_db_once():
         if not exists:
             cur.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'basic'")
             conn.commit()
-            return {"status": "plan column CREATED"}
+            return jsonify({"status": "plan column CREATED"})
 
-        return {"status": "plan column already exists"}
-
+        return jsonify({"status": "plan column already exists"})
     except Exception as e:
-        return {"error": str(e)}
-
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         cur.close()
         conn.close()
 
 # ----------------------------
-# INIT DB BEIM APP START (nicht beim Request!)
+# INIT DB ON IMPORT (FAST, SAFE)
 # ----------------------------
-print("🔵 Initializing database once at startup...")
 try:
+    print("🔵 Initializing database...")
     init_db()
     print("✅ Database ready")
 except Exception as e:
+    # Do not crash the process hard; log it
     print("❌ DB INIT FAILED:", e)
