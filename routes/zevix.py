@@ -118,15 +118,6 @@ def init_db():
 
 zevix_bp = Blueprint("zevix", __name__)
 
-_db_ready = False
-
-@zevix_bp.before_app_request
-def ensure_db():
-    global _db_ready
-    if not _db_ready:
-        init_db()
-        _db_ready = True
-
 
 # ----------------------------
 # REGISTER
