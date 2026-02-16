@@ -147,6 +147,49 @@ def login():
 
 
 # ----------------------------
+# LEAD CONSUMPTION
+# ----------------------------
+@zevix_bp.route("/zevix/consume-leads", methods=["POST"])
+def consume_leads():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email")
+    leads_count = data.get("leads_count")
+
+    if not email or leads_count is None:
+        return jsonify({"success": False, "message": "Invalid data"}), 400
+
+    month = datetime.now().strftime("%Y-%m")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Abrufen der aktuellen verbrauchten Leads
+            cur.execute("SELECT used FROM usage WHERE user_email=%s AND month=%s", (email, month))
+            result = cur.fetchone()
+
+            if result:
+                used = result["used"]
+            else:
+                # Falls noch keine Leads für diesen Monat verbraucht wurden
+                cur.execute("""
+                    INSERT INTO usage (user_email, month, used)
+                    VALUES (%s, %s, 0)
+                    ON CONFLICT (user_email, month) DO NOTHING
+                """, (email, month))
+                used = 0
+
+            # Aktualisieren der verbrauchten Leads
+            new_used = used + leads_count
+            cur.execute("""
+                UPDATE usage
+                SET used = %s
+                WHERE user_email = %s AND month = %s
+            """, (new_used, email, month))
+            conn.commit()
+
+    return jsonify({"success": True, "used": new_used, "message": "Leads consumed successfully"})
+
+
+# ----------------------------
 # OPTIONAL ONE-TIME MIGRATION
 # ----------------------------
 @zevix_bp.route("/__fix_db_once")
