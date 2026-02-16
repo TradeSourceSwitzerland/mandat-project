@@ -13,6 +13,7 @@ from email.mime.application import MIMEApplication
 from routes.zevix import zevix_bp
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key")
 # HTTPS-Information von Reverse-Proxies (z. B. Render) korrekt übernehmen
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
