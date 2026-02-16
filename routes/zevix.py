@@ -103,54 +103,6 @@ def cookie_options():
         opts["domain"] = COOKIE_DOMAIN
     return opts
 
-def load_user_session(email):
-    month = get_month_key()
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            user = find_user_by_email(cur, email)
-            if not user:
-                return None
-            canonical_email = user["email"]
-            plan = normalize_plan(user.get("plan"))
-            auth_until = user.get("valid_until") or default_auth_until_ms()
-            cur.execute(
-                """
-                UPDATE users
-                SET plan=%s,
-                    valid_until=COALESCE(valid_until, %s)
-                WHERE email=%s
-                """,
-                (plan, auth_until, canonical_email),
-            )
-            cur.execute(
-                """
-                INSERT INTO usage (user_email, month, used, used_ids)
-                VALUES (%s, %s, 0, '[]'::jsonb)
-                ON CONFLICT (user_email, month) DO NOTHING
-                """,
-                (canonical_email, month),
-            )
-            cur.execute(
-                """
-                SELECT used, used_ids
-                FROM usage
-                WHERE user_email=%s AND month=%s
-                """,
-                (canonical_email, month),
-            )
-            usage = cur.fetchone() or {}
-            used = int(usage.get("used") or 0)
-            used_ids = usage.get("used_ids") or []
-        conn.commit()
-    return {
-        "email": canonical_email,
-        "plan": plan,
-        "auth_until": auth_until,
-        "month": month,
-        "used": used,
-        "used_ids": used_ids,
-    }
-
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL fehlt")
@@ -207,34 +159,55 @@ def login():
             if not verify_password(password, user.get("password")):
                 return jsonify({"success": False, "message": "wrong_password"}), 401
 
-    session = load_user_session(email)
-    if not session:
-        return jsonify({"success": False, "message": "not_found"}), 404
+    # Hier kombinieren wir Plan- und Verbrauchsdaten
+    month = get_month_key()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT plan, valid_until FROM users WHERE email=%s
+                """,
+                (email,)
+            )
+            user_data = cur.fetchone()
 
-    # JWT Token erstellen
+            plan = user_data["plan"]
+            valid_until = user_data["valid_until"] or default_auth_until_ms()
+
+            # Leads-Verbrauch in der gleichen Funktion aktualisieren
+            cur.execute(
+                """
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
+                ON CONFLICT (user_email, month) DO NOTHING
+                """,
+                (email, month),
+            )
+
+            cur.execute(
+                """
+                SELECT used, used_ids
+                FROM usage
+                WHERE user_email=%s AND month=%s
+                """,
+                (email, month),
+            )
+            usage = cur.fetchone() or {}
+            used = int(usage.get("used") or 0)
+            used_ids = usage.get("used_ids") or []
+
+        conn.commit()
+
+    # JWT-Token erstellen
     token = create_jwt_token(email)
 
-    response = jsonify({"success": True, **session, "token": token})
+    response = jsonify({"success": True, "plan": plan, "valid_until": valid_until, "used": used, "used_ids": used_ids, "token": token})
 
     cookie_cfg = cookie_options()
 
-    response.set_cookie(
-        "auth_token",
-        token,
-        httponly=COOKIE_HTTPONLY,
-        **cookie_cfg,
-    )  # 30 Tage
-
-    response.set_cookie(
-        "zevix_email",
-        session["email"],
-        **cookie_cfg,
-    )
-    response.set_cookie(
-        "plan",
-        session["plan"],
-        **cookie_cfg,
-    )
+    response.set_cookie("auth_token", token, httponly=COOKIE_HTTPONLY, **cookie_cfg)
+    response.set_cookie("zevix_email", email, **cookie_cfg)
+    response.set_cookie("plan", plan, **cookie_cfg)
 
     return response
 
@@ -246,9 +219,7 @@ def stripe_webhook():
     event = None
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, os.getenv("STRIPE_ENDPOINT_SECRET")
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, os.getenv("STRIPE_ENDPOINT_SECRET"))
     except ValueError as e:
         return jsonify(success=False), 400
     except stripe.error.SignatureVerificationError as e:
@@ -272,13 +243,22 @@ def stripe_webhook():
                 )
                 conn.commit()
 
+                # Leads-Verbrauch zurücksetzen
+                cur.execute(
+                    """
+                    UPDATE usage
+                    SET used = 0, used_ids = '[]'::jsonb
+                    WHERE user_email=%s
+                    """,
+                    (email,)
+                )
+                conn.commit()
+
         # Cookie für den Plan setzen
         response = jsonify(success=True)
         cookie_cfg = cookie_options()
 
-        response.set_cookie(
-            "plan", plan, **cookie_cfg
-        )
+        response.set_cookie("plan", plan, **cookie_cfg)
 
         return response
 
