@@ -1,4 +1,5 @@
 import os
+import logging
 import bcrypt
 import jwt
 import psycopg
@@ -52,6 +53,12 @@ def request_payload() -> dict:
     if request.form:
         return request.form.to_dict(flat=True)
     return {}
+
+
+def resolve_session_id(data: dict) -> str:
+    payload_session_id = str(data.get("session_id") or "").strip()
+    query_session_id = str(request.args.get("session_id") or "").strip()
+    return payload_session_id or query_session_id
 
 
 def find_user_by_email(cur, email: str) -> dict | None:
@@ -156,16 +163,19 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
 
     # 2) fallback via Stripe Price-ID (robuster für Payment Links)
     plan_by_price_id = configured_price_plan_map()
-    session_id = checkout_session.get("id")
-    if not session_id:
-        return "none"
+    line_items = (checkout_session.get("line_items") or {}).get("data")
+    if not line_items:
+        session_id = checkout_session.get("id")
+        if not session_id:
+            return "none"
 
-    try:
-        line_items = stripe.checkout.Session.list_line_items(session_id, limit=10)
-    except Exception:
-        return "none"
+        try:
+            line_items = stripe.checkout.Session.list_line_items(session_id, limit=10).get("data", [])
+        except Exception as exc:
+            logging.warning("Stripe line items konnten nicht geladen werden: %s", exc)
+            return "none"
 
-    for item in line_items.get("data", []):
+    for item in line_items:
         price = item.get("price") or {}
         price_id = price.get("id")
         resolved = normalize_plan(plan_by_price_id.get(price_id))
@@ -292,24 +302,41 @@ def login():
 @zevix_bp.route("/zevix/verify-session", methods=["POST"])
 def verify_session():
     data = request_payload()
-    session_id = str(data.get("session_id") or "").strip()
+    session_id = resolve_session_id(data)
+    logging.debug("verify-session aufgerufen, session_id=%s", session_id)
     if not session_id:
         return jsonify(success=False, message="missing_session_id"), 400
 
     try:
-        checkout_session = stripe.checkout.Session.retrieve(session_id)
-    except Exception:
+        checkout_session = stripe.checkout.Session.retrieve(session_id, expand=["line_items.data.price"])
+    except Exception as exc:
+        logging.warning("Stripe Session konnte nicht geladen werden, session_id=%s, error=%s", session_id, exc)
         return jsonify(success=False, message="invalid_session"), 400
 
     payment_status = str(checkout_session.get("payment_status") or "").lower()
     session_status = str(checkout_session.get("status") or "").lower()
+    logging.debug(
+        "Stripe Session geladen, session_id=%s, payment_status=%s, session_status=%s",
+        session_id,
+        payment_status,
+        session_status,
+    )
     if payment_status != "paid" and session_status != "complete":
+        logging.info(
+            "Zahlung nicht abgeschlossen, session_id=%s, payment_status=%s, session_status=%s",
+            session_id,
+            payment_status,
+            session_status,
+        )
         return jsonify(success=False, message="payment_not_completed"), 409
 
     updated, message = apply_checkout_result_to_user(checkout_session)
     if not updated:
+        logging.warning("User-Update fehlgeschlagen, session_id=%s, message=%s", session_id, message)
         status_code = 404 if message == "user_not_found" else 400
         return jsonify(success=False, message=message), status_code
+
+    logging.info("verify-session erfolgreich, session_id=%s", session_id)
 
     return jsonify(success=True)
 
@@ -335,5 +362,3 @@ def stripe_webhook():
     if not updated:
         status_code = 404 if message == "user_not_found" else 400
         return jsonify(success=False, error=message), status_code
-
-    return jsonify(success=True)
