@@ -30,8 +30,6 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
 
-if not EMAIL_HOST_PASSWORD:
-    raise RuntimeError("EMAIL_HOST_PASSWORD is not set. Please set the environment variable.")
 
 # ----------------------------
 # HTML-Formular anzeigen
@@ -45,6 +43,13 @@ def show_mandat_form():
 # ----------------------------
 @app.route("/api/sendmail", methods=["POST"])
 def sendmail():
+    # Config erst zur Laufzeit prüfen (nicht beim App-Start!)
+    if not EMAIL_HOST_PASSWORD:
+        return jsonify({
+            "success": False,
+            "error": "Mail configuration missing"
+        }), 500
+
     try:
         data = request.json
         form_source = data.get("form_source", "mandat_original")
