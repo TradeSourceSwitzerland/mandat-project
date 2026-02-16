@@ -298,3 +298,32 @@ def stats():
         "success": True,
         "total_leads": int(total)
     })
+
+# 🔥 TEMP DB MIGRATION (RUN ONCE THEN DELETE)
+@zevix_bp.route("/__fix_db_once")
+def fix_db_once():
+    try:
+        conn = get_conn()   # ✅ richtige Funktion!
+        cur = conn.cursor()
+
+        # Prüfen ob Spalte existiert
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='users' AND column_name='plan'
+        """)
+        exists = cur.fetchone()
+
+        if not exists:
+            cur.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'basic'")
+            conn.commit()
+            return {"status": "plan column CREATED"}
+
+        return {"status": "plan column already exists"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cur.close()
+        conn.close()
