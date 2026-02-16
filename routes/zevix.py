@@ -12,12 +12,34 @@ from datetime import datetime
 DATABASE_URL = os.getenv("DATABASE_URL")
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
+PLAN_ALIASES = {
+    "basic": "basic",
+    "starter": "basic",
+    "business": "business",
+    "pro": "business",
+    "enterprise": "enterprise",
+    "premium": "enterprise",
+    "none": "none",
+    "free": "none",
+}
+
+
 # ----------------------------
 # HELPERS
 # ----------------------------
 def normalize_plan(plan):
     p = str(plan or "none").strip().lower()
-    return p if p in VALID_PLANS else "none"
+    if p in VALID_PLANS:
+        return p
+    return PLAN_ALIASES.get(p, "none")
+
+def get_nested(data, *path):
+    cur = data
+    for key in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    return cur
 
 def extract_plan(data):
     """Unterstützt alte/neue Payload-Feldnamen für das Abo."""
@@ -26,7 +48,27 @@ def extract_plan(data):
         or data.get("abo")
         or data.get("subscription")
         or data.get("tier")
+        or get_nested(data, "metadata", "plan")
+        or get_nested(data, "data", "object", "metadata", "plan")
+        or get_nested(data, "data", "object", "plan")
+        or get_nested(data, "data", "object", "subscription")
     )
+
+def extract_email(data):
+    """Unterstützt alternative Feldnamen für E-Mail aus Webflow/Stripe Flows."""
+    raw = (
+        data.get("email")
+        or data.get("user_email")
+        or data.get("customer_email")
+        or data.get("zevix_email")
+        or get_nested(data, "customer_details", "email")
+        or get_nested(data, "metadata", "email")
+        or get_nested(data, "data", "object", "customer_email")
+        or get_nested(data, "data", "object", "receipt_email")
+        or get_nested(data, "data", "object", "customer_details", "email")
+        or get_nested(data, "data", "object", "metadata", "email")
+    )
+    return str(raw or "").strip().lower()
 
 def extract_email(data):
     """Unterstützt alternative Feldnamen für E-Mail aus Webflow/Stripe Flows."""
@@ -42,7 +84,29 @@ def extract_email(data):
 
 def extract_auth_until(data):
     """Unterstützt alternative Feldnamen für Laufzeit."""
-    return data.get("auth_until", data.get("valid_until"))
+    raw = (
+        data.get("auth_until")
+        or data.get("valid_until")
+        or data.get("expires_at")
+        or data.get("current_period_end")
+        or get_nested(data, "data", "object", "auth_until")
+        or get_nested(data, "data", "object", "valid_until")
+        or get_nested(data, "data", "object", "current_period_end")
+        or get_nested(data, "data", "object", "expires_at")
+    )
+
+    if raw is None:
+        return None
+
+    try:
+        ts = int(raw)
+    except (TypeError, ValueError):
+        return raw
+
+    # Stripe liefert oft Sekunden, Frontend arbeitet mit Millisekunden.
+    if ts < 10**12:
+        ts *= 1000
+    return ts
 
 def default_auth_until_ms():
     return int((datetime.now().timestamp() + 30 * 24 * 60 * 60) * 1000)
