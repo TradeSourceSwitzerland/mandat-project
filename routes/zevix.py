@@ -1,5 +1,4 @@
 import os
- 
 import bcrypt
 import jwt
 import psycopg
@@ -8,36 +7,35 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, session
 from hmac import compare_digest
 from psycopg.rows import dict_row
- 
+
 # ---------------------------- CONFIG ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")
- 
+
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 DEFAULT_PLAN_BY_PRICE_ID = {
-    # bekannte Stripe Test-Payment-Links von zevix.ch/preise
     "price_1Rnw4gD8Uub4ATfM8RBzv8TA": "basic",
     "price_1Rnw5HD8Uub4ATfMRf4jDsiN": "business",
     "price_1Rnw5uD8Uub4ATfMGfYjdWwW": "enterprise",
 }
- 
+
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
     value = str(plan or "none").strip().lower()
     return value if value in VALID_PLANS else "none"
- 
- 
+
+
 def default_auth_until_ms() -> int:
-    return int((datetime.now()   timedelta(days=30)).timestamp() * 1000)
- 
- 
+    return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
+
+
 def get_month_key() -> str:
     return datetime.now().strftime("%Y-%m")
- 
- 
+
+
 def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
-    expiration = datetime.utcnow()   timedelta(days=30)
+    expiration = datetime.utcnow() + timedelta(days=30)
     payload = {
         "email": email,
         "plan": normalize_plan(plan),
@@ -45,8 +43,8 @@ def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
         "exp": expiration,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
- 
- 
+
+
 def request_payload() -> dict:
     data = request.get_json(silent=True)
     if isinstance(data, dict):
@@ -54,8 +52,8 @@ def request_payload() -> dict:
     if request.form:
         return request.form.to_dict(flat=True)
     return {}
- 
- 
+
+
 def find_user_by_email(cur, email: str) -> dict | None:
     cur.execute(
         """
@@ -68,8 +66,8 @@ def find_user_by_email(cur, email: str) -> dict | None:
         (email.lower(),),
     )
     return cur.fetchone()
- 
- 
+
+
 def verify_password(password: str, stored_password: str | None) -> bool:
     if not stored_password:
         return False
@@ -79,14 +77,14 @@ def verify_password(password: str, stored_password: str | None) -> bool:
         return bcrypt.checkpw(candidate, stored)
     except ValueError:
         return compare_digest(password or "", stored_password)
- 
- 
+
+
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL fehlt")
     return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
- 
- 
+
+
 def configured_price_plan_map() -> dict[str, str]:
     mapping = dict(DEFAULT_PLAN_BY_PRICE_ID)
     env_map = {
@@ -98,59 +96,58 @@ def configured_price_plan_map() -> dict[str, str]:
         if price_id:
             mapping[price_id] = plan
     return mapping
- 
- 
+
+
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     email = (checkout_session.get("customer_email") or "").strip().lower()
     if email:
         return email
     customer_details = checkout_session.get("customer_details") or {}
     return str(customer_details.get("email") or "").strip().lower()
- 
- 
+
+
 def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     # 1) bevorzugt metadata.plan
     metadata_plan = normalize_plan((checkout_session.get("metadata") or {}).get("plan"))
     if metadata_plan != "none":
         return metadata_plan
- 
+
     # 2) fallback via Stripe Price-ID (robuster für Payment Links)
     plan_by_price_id = configured_price_plan_map()
     session_id = checkout_session.get("id")
     if not session_id:
         return "none"
- 
+
     try:
         line_items = stripe.checkout.Session.list_line_items(session_id, limit=10)
     except Exception:
         return "none"
- 
+
     for item in line_items.get("data", []):
         price = item.get("price") or {}
         price_id = price.get("id")
         resolved = normalize_plan(plan_by_price_id.get(price_id))
         if resolved != "none":
             return resolved
- 
+
     return "none"
- 
- 
+
+
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
- 
- 
+
 # ---------------------------- REGISTER ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
     data = request_payload()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
- 
+
     if not email or not password:
         return jsonify({"success": False, "message": "missing"}), 400
- 
+
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
- 
+
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -165,18 +162,18 @@ def register():
         return jsonify({"success": True})
     except psycopg.errors.UniqueViolation:
         return jsonify({"success": False, "message": "exists"}), 400
- 
- 
+
+
 # ---------------------------- LOGIN ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
     data = request_payload()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
- 
+
     if not email or not password:
         return jsonify({"success": False, "message": "missing"}), 400
- 
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             user = find_user_by_email(cur, email)
@@ -184,7 +181,7 @@ def login():
                 return jsonify({"success": False, "message": "not_found"}), 404
             if not verify_password(password, user.get("password")):
                 return jsonify({"success": False, "message": "wrong_password"}), 401
- 
+
     month = get_month_key()
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -200,7 +197,7 @@ def login():
 
             plan = normalize_plan(user_data.get("plan"))
             valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
- 
+
             cur.execute(
                 """
                 INSERT INTO usage (user_email, month, used, used_ids)
@@ -209,7 +206,7 @@ def login():
                 """,
                 (email, month),
             )
- 
+
             cur.execute(
                 """
                 SELECT used, used_ids
@@ -222,9 +219,9 @@ def login():
             used = int(usage.get("used") or 0)
             used_ids = usage.get("used_ids") or []
         conn.commit()
- 
+
     token = create_jwt_token(email, plan, valid_until)
- 
+
     response = jsonify(
         {
             "success": True,
@@ -239,47 +236,47 @@ def login():
             "token": token,
         }
     )
- 
+
     session["auth_token"] = token
     session["email"] = email
     session["plan"] = plan
     session["used"] = used
     session["used_ids"] = used_ids
- 
+
     return response
- 
- 
+
+
 # ---------------------------- STRIPE WEBHOOK ----------------------------
 @zevix_bp.route("/webhook", methods=["POST"])
 def stripe_webhook():
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get("Stripe-Signature")
- 
+
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, os.getenv("STRIPE_ENDPOINT_SECRET"))
     except ValueError:
         return jsonify(success=False, error="invalid_payload"), 400
     except stripe.error.SignatureVerificationError:
         return jsonify(success=False, error="invalid_signature"), 400
- 
+
     if event.get("type") != "checkout.session.completed":
         return jsonify(success=True)
- 
+
     checkout_session = event.get("data", {}).get("object", {})
     email = resolve_email_from_checkout_session(checkout_session)
     if not email:
         return jsonify(success=False, error="missing_customer_email"), 400
- 
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
             user_row = cur.fetchone()
             if not user_row:
                 return jsonify(success=False, error="user_not_found"), 404
- 
+
             old_plan = normalize_plan(user_row.get("plan"))
             new_plan = resolve_plan_from_checkout_session(checkout_session)
- 
+
             # WICHTIG: niemals auf none downgraden, wenn Webhook keine klare Plan-Info liefert
             if new_plan == "none":
                 new_plan = old_plan
@@ -293,7 +290,7 @@ def stripe_webhook():
                     """,
                     (email,),
                 )
- 
+
             cur.execute(
                 """
                 UPDATE users
@@ -303,5 +300,5 @@ def stripe_webhook():
                 (new_plan, default_auth_until_ms(), email),
             )
         conn.commit()
- 
+
     return jsonify(success=True)
