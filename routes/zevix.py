@@ -327,16 +327,17 @@ def verify_session():
         payment_status,
         session_status,
     )
-    # Trial- bzw. offene Checkout-Sessions sollen nicht in einem Reload-Loop enden.
+    # Trial-, offene oder kostenfreie Checkout-Sessions sollen nicht in einem Reload-Loop enden.
     # In diesen Fällen darf das Frontend den User direkt ins Dashboard leiten.
-    if payment_status == "pending" or session_status == "open":
+    free_or_trial_statuses = {"pending", "unpaid", "no_payment_required"}
+    if payment_status in free_or_trial_statuses or session_status == "open":
         logging.info(
-            "Session in Testphase/offen, Dashboard-Redirect erlaubt: session_id=%s, payment_status=%s, session_status=%s",
+            "Session in Testphase/kostenfrei/offen, Dashboard-Redirect erlaubt: session_id=%s, payment_status=%s, session_status=%s",
             session_id,
             payment_status,
             session_status,
         )
-        return jsonify(success=True, message="in_trial_phase")
+        return jsonify(success=True, message="in_trial_or_free")
 
     if payment_status != "paid" and session_status != "complete":
         logging.info(
