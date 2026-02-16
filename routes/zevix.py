@@ -106,6 +106,48 @@ def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     return str(customer_details.get("email") or "").strip().lower()
 
 
+def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
+    email = resolve_email_from_checkout_session(checkout_session)
+    if not email:
+        return False, "missing_customer_email"
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan FROM users WHERE lower(email)=%s", (email,))
+            user_row = cur.fetchone()
+            if not user_row:
+                return False, "user_not_found"
+
+            old_plan = normalize_plan(user_row.get("plan"))
+            new_plan = resolve_plan_from_checkout_session(checkout_session)
+
+            # Niemals auf none downgraden, wenn keine belastbare Plan-Info vorliegt
+            if new_plan == "none":
+                new_plan = old_plan
+
+            if old_plan != new_plan:
+                cur.execute(
+                    """
+                    UPDATE usage
+                    SET used = 0, used_ids = '[]'::jsonb
+                    WHERE user_email=%s
+                    """,
+                    (email,),
+                )
+
+            cur.execute(
+                """
+                UPDATE users
+                SET plan=%s, valid_until=%s
+                WHERE lower(email)=%s
+                """,
+                (new_plan, default_auth_until_ms(), email),
+            )
+        conn.commit()
+
+    return True, "ok"
+
+
 def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     # 1) bevorzugt metadata.plan
     metadata_plan = normalize_plan((checkout_session.get("metadata") or {}).get("plan"))
@@ -246,6 +288,31 @@ def login():
     return response
 
 
+@zevix_bp.route("/zevix/verify-session", methods=["POST"])
+def verify_session():
+    data = request_payload()
+    session_id = str(data.get("session_id") or "").strip()
+    if not session_id:
+        return jsonify(success=False, message="missing_session_id"), 400
+
+    try:
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+    except Exception:
+        return jsonify(success=False, message="invalid_session"), 400
+
+    payment_status = str(checkout_session.get("payment_status") or "").lower()
+    session_status = str(checkout_session.get("status") or "").lower()
+    if payment_status != "paid" and session_status != "complete":
+        return jsonify(success=False, message="payment_not_completed"), 409
+
+    updated, message = apply_checkout_result_to_user(checkout_session)
+    if not updated:
+        status_code = 404 if message == "user_not_found" else 400
+        return jsonify(success=False, message=message), status_code
+
+    return jsonify(success=True)
+
+
 # ---------------------------- STRIPE WEBHOOK ----------------------------
 @zevix_bp.route("/webhook", methods=["POST"])
 def stripe_webhook():
@@ -263,42 +330,9 @@ def stripe_webhook():
         return jsonify(success=True)
 
     checkout_session = event.get("data", {}).get("object", {})
-    email = resolve_email_from_checkout_session(checkout_session)
-    if not email:
-        return jsonify(success=False, error="missing_customer_email"), 400
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT plan FROM users WHERE lower(email)=%s", (email,))
-            user_row = cur.fetchone()
-            if not user_row:
-                return jsonify(success=False, error="user_not_found"), 404
-
-            old_plan = normalize_plan(user_row.get("plan"))
-            new_plan = resolve_plan_from_checkout_session(checkout_session)
-
-            # WICHTIG: niemals auf none downgraden, wenn Webhook keine klare Plan-Info liefert
-            if new_plan == "none":
-                new_plan = old_plan
-
-            if old_plan != new_plan:
-                cur.execute(
-                    """
-                    UPDATE usage
-                    SET used = 0, used_ids = '[]'::jsonb
-                    WHERE user_email=%s
-                    """,
-                    (email,),
-                )
-
-            cur.execute(
-                """
-                UPDATE users
-                SET plan=%s, valid_until=%s
-                WHERE lower(email)=%s
-                """,
-                (new_plan, default_auth_until_ms(), email),
-            )
-        conn.commit()
+    updated, message = apply_checkout_result_to_user(checkout_session)
+    if not updated:
+        status_code = 404 if message == "user_not_found" else 400
+        return jsonify(success=False, error=message), status_code
 
     return jsonify(success=True)
