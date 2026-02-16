@@ -3,3 +3,4 @@ Flask-CORS
 gunicorn
 psycopg[binary]
 bcrypt
+stripe
