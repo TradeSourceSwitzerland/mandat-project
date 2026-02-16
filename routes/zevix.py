@@ -5,13 +5,12 @@ from psycopg.rows import dict_row
 import bcrypt
 import stripe
 import jwt
-from flask import Blueprint, jsonify, request
+from flask import Flask, Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from hmac import compare_digest
 
-# ----------------------------
-# CONFIG
-# ----------------------------
+# ---------------------------- CONFIG ----------------------------
+app = Flask(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # Dein Stripe-Secret-Key
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Dein geheimen Schlüssel für JWT
@@ -22,9 +21,8 @@ COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "auto").strip().lower()
 
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
-# ----------------------------
-# HELPERS
-# ----------------------------
+# ---------------------------- HELPERS ----------------------------
+
 def normalize_plan(plan):
     p = str(plan or "none").strip().lower()
     return p if p in VALID_PLANS else "none"
@@ -45,19 +43,17 @@ def create_jwt_token(email):
         "exp": expiration,
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    print(f"JWT-Token erstellt: {token}")  # Debugging-Ausgabe
     return token
 
 
 def decode_jwt_token(token):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        print(f"Token dekodiert: {payload}")  # Protokolliere den dekodierten Token
         return payload
     except jwt.ExpiredSignatureError:
-        print("Token abgelaufen!")
+        return None
     except jwt.InvalidTokenError:
-        print("Ungültiges Token!")
+        return None
 
 
 def request_payload():
@@ -85,16 +81,15 @@ def find_user_by_email(cur, email):
 
 def verify_password(password, stored_password):
     if not stored_password:
-        return False, False
+        return False
 
     candidate = (password or "").encode()
     stored = stored_password.encode()
 
     try:
-        return bcrypt.checkpw(candidate, stored), False
+        return bcrypt.checkpw(candidate, stored)
     except ValueError:
-        # Legacy fallback: allow plain text passwords and migrate on next login.
-        return compare_digest(password or "", stored_password), True
+        return compare_digest(password or "", stored_password)
 
 
 def cookie_options():
@@ -107,14 +102,13 @@ def cookie_options():
     if COOKIE_SAMESITE in {"lax", "strict", "none"}:
         samesite = COOKIE_SAMESITE.capitalize()
     else:
-        # SameSite=None benötigt Secure=True
         samesite = "None" if secure else "Lax"
 
     return {
         "secure": secure,
         "samesite": samesite,
+        "domain": "www.zevix.ch",  # Setze die Domain explizit
         "max_age": 30 * 24 * 60 * 60,
-        "domain": "www.zevix.ch"  # Setze die Domain explizit
     }
 
 
@@ -124,16 +118,13 @@ def load_user_session(email):
     with get_conn() as conn:
         with conn.cursor() as cur:
             user = find_user_by_email(cur, email)
-            print(f"Benutzer gefunden: {user}")  # Debugging-Ausgabe
             if not user:
                 return None
 
             canonical_email = user["email"]
-
             plan = normalize_plan(user.get("plan"))
             auth_until = user.get("valid_until") or default_auth_until_ms()
 
-            # Persistiere Defaults sauber
             cur.execute(
                 """
                 UPDATE users
@@ -144,7 +135,6 @@ def load_user_session(email):
                 (plan, auth_until, canonical_email),
             )
 
-            # Usage row sicherstellen
             cur.execute(
                 """
                 INSERT INTO usage (user_email, month, used, used_ids)
@@ -178,22 +168,15 @@ def load_user_session(email):
     }
 
 
-# ----------------------------
-# DATABASE CONNECTION
-# ----------------------------
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL fehlt")
     return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
 
 
-# ----------------------------
-# INIT DB (lightweight + migration safe)
-# ----------------------------
 def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
-            # USERS TABLE
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
@@ -206,7 +189,6 @@ def init_db():
                 """
             )
 
-            # USAGE TABLE
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS usage (
@@ -220,7 +202,6 @@ def init_db():
                 """
             )
 
-            # Defaults für existierende Nutzer
             cur.execute(
                 """
                 UPDATE users
@@ -231,16 +212,37 @@ def init_db():
 
         conn.commit()
 
+# ---------------------------- REGISTER ----------------------------
+@zevix_bp.route("/zevix/register", methods=["POST"])
+def register():
+    data = request_payload()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
 
-# ----------------------------
-# BLUEPRINT
-# ----------------------------
-zevix_bp = Blueprint("zevix", __name__)
+    if not email or not password:
+        return jsonify({"success": False, "message": "missing"}), 400
+
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (email, password, plan, valid_until)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (email, hashed, "none", default_auth_until_ms()),
+                )
+            conn.commit()
+
+        return jsonify({"success": True})
+
+    except psycopg.errors.UniqueViolation:
+        return jsonify({"success": False, "message": "exists"}), 400
 
 
-# ----------------------------
-# LOGIN (JWT Token erstellen und zurückgeben)
-# ----------------------------
+# ---------------------------- LOGIN ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
     data = request_payload()
@@ -256,17 +258,8 @@ def login():
             if not user:
                 return jsonify({"success": False, "message": "not_found"}), 404
 
-            ok, legacy_plaintext = verify_password(password, user.get("password"))
-            if not ok:
+            if not verify_password(password, user.get("password")):
                 return jsonify({"success": False, "message": "wrong_password"}), 401
-
-            if legacy_plaintext:
-                cur.execute(
-                    "UPDATE users SET password=%s WHERE email=%s",
-                    (bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(), user["email"]),
-                )
-
-        conn.commit()
 
     session = load_user_session(email)
     if not session:
@@ -275,23 +268,32 @@ def login():
     # JWT Token erstellen
     token = create_jwt_token(email)
 
-    # Debugging-Ausgabe
-    print(f"Token für {email}: {token}")
-
-    # Erstelle ein Antwortobjekt mit Cookie
     response = jsonify({"success": True, **session, "token": token})
 
-    # JWT als Cookie setzen (HttpOnly und Secure)
     cookie_cfg = cookie_options()
 
     response.set_cookie(
         "auth_token",
         token,
         httponly=True,
-        secure=True,   # Nur, wenn HTTPS verwendet wird
-        samesite="None",  # Falls SameSite=None gebraucht wird
-        max_age=2592000,  # 30 Tage
-        domain="www.zevix.ch",  # Sicherstellen, dass der Cookie auf der richtigen Domain gesetzt wird
+        **cookie_cfg,
+    )  # 30 Tage
+
+    response.set_cookie(
+        "zevix_email",
+        session["email"],
+        **cookie_cfg,
+    )
+    response.set_cookie(
+        "plan",
+        session["plan"],
+        **cookie_cfg,
     )
 
     return response
+
+
+# ---------------------------- STARTING THE FLASK APP ----------------------------
+if __name__ == "__main__":
+    app.register_blueprint(zevix_bp)
+    app.run(debug=True)
