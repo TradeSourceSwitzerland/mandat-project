@@ -5,7 +5,7 @@ from psycopg.rows import dict_row
 import bcrypt
 import stripe
 import jwt
-from flask import Flask, Blueprint, jsonify, request
+from flask import Flask, Blueprint, jsonify, request, make_response
 from datetime import datetime, timedelta
 
 # ----------------------------
@@ -187,7 +187,8 @@ def login():
     # JWT Token erstellen
     token = create_jwt_token(email)
 
-    return jsonify({
+    # Erstelle ein Antwortobjekt mit Cookie
+    response = jsonify({
         "success": True,
         "email": email,
         "plan": plan,
@@ -195,35 +196,35 @@ def login():
         "month": month,
         "used": used,
         "used_ids": used_ids,
-        "token": token  # Token wird zurückgegeben
+        "token": token
     })
+
+    # JWT als Cookie setzen (HttpOnly und Secure)
+    response.set_cookie("auth_token", token, httponly=True, secure=True, max_age=30*24*60*60)  # 30 Tage
+
+    return response
 
 # ----------------------------
 # SUCCESS (Stripe Webhook)
 # ----------------------------
 @zevix_bp.route("/success", methods=["GET"])
 def success():
-    # 1) Parameter aus der URL lesen
     session_id = request.args.get("session_id")
     plan = request.args.get("plan")
 
-    # Sicherheit: ohne session_id nichts tun
     if not session_id or not plan:
         return jsonify({"error": "Missing session_id or plan"}), 400
 
-    # 2) Stripe-Session validieren
     try:
         session = stripe.checkout.Session.retrieve(session_id)
         if session.payment_status != 'paid':
             return jsonify({"error": "Payment not successful"}), 400
 
-        # 3) Abo-Daten aktualisieren
-        email = session.customer_email  # E-Mail des Käufers
-        auth_until = int((datetime.now() + timedelta(days=30)).timestamp() * 1000)  # Setze die Laufzeit auf 30 Tage
+        email = session.customer_email
+        auth_until = int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
 
         with get_conn() as conn:
             with conn.cursor() as cur:
-                # 4) Abo in DB aktualisieren
                 cur.execute(""" 
                     UPDATE users 
                     SET plan=%s, valid_until=%s 
