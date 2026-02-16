@@ -288,6 +288,7 @@ def login():
     return response
 
 
+# ---------------------------- VERIFY SESSION ----------------------------
 @zevix_bp.route("/zevix/verify-session", methods=["POST"])
 def verify_session():
     data = request_payload()
