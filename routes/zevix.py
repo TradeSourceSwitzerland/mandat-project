@@ -16,9 +16,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")
 
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 DEFAULT_PLAN_BY_PRICE_ID = {
-    "price_1Rnw4gD8Uub4ATfM8RBzv8TA": "basic",
-    "price_1Rnw5HD8Uub4ATfMRf4jDsiN": "business",
-    "price_1Rnw5uD8Uub4ATfMGfYjdWwW": "enterprise",
+    "prod_TxPBWrcKyJ8EiK": "enterprise",  # Live-Preis-ID für Enterprise
+    "prod_TxPABMR85vBl2U": "business",    # Live-Preis-ID für Business
+    "prod_TxPAEQ2MB1FblT": "basic",       # Live-Preis-ID für Basic
 }
 
 # ---------------------------- HELPERS ----------------------------
