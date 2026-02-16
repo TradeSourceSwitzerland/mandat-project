@@ -98,6 +98,9 @@ def configured_price_plan_map() -> dict[str, str]:
         os.getenv("STRIPE_PRICE_BASIC"): "basic",
         os.getenv("STRIPE_PRICE_BUSINESS"): "business",
         os.getenv("STRIPE_PRICE_ENTERPRISE"): "enterprise",
+        os.getenv("STRIPE_PRODUCT_BASIC"): "basic",
+        os.getenv("STRIPE_PRODUCT_BUSINESS"): "business",
+        os.getenv("STRIPE_PRODUCT_ENTERPRISE"): "enterprise",
     }
     for price_id, plan in env_map.items():
         if price_id:
@@ -178,7 +181,10 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     for item in line_items:
         price = item.get("price") or {}
         price_id = price.get("id")
-        resolved = normalize_plan(plan_by_price_id.get(price_id))
+        product_id = price.get("product")
+        resolved = normalize_plan(
+            plan_by_price_id.get(price_id) or plan_by_price_id.get(product_id)
+        )
         if resolved != "none":
             return resolved
 
@@ -362,3 +368,5 @@ def stripe_webhook():
     if not updated:
         status_code = 404 if message == "user_not_found" else 400
         return jsonify(success=False, error=message), status_code
+
+    return jsonify(success=True)
