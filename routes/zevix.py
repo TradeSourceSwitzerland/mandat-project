@@ -189,7 +189,7 @@ def login():
                 """
                 SELECT plan, valid_until
                 FROM users
-                WHERE email=%s
+                WHERE lower(email)=%s
                 """,
                 (email,),
             )
@@ -269,7 +269,7 @@ def stripe_webhook():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+            cur.execute("SELECT plan FROM users WHERE lower(email)=%s", (email,))
             user_row = cur.fetchone()
             if not user_row:
                 return jsonify(success=False, error="user_not_found"), 404
@@ -295,7 +295,7 @@ def stripe_webhook():
                 """
                 UPDATE users
                 SET plan=%s, valid_until=%s
-                WHERE email=%s
+                WHERE lower(email)=%s
                 """,
                 (new_plan, default_auth_until_ms(), email),
             )
