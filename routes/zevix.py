@@ -28,6 +28,18 @@ def extract_plan(data):
         or data.get("tier")
     )
 
+def extract_email(data):
+    """Unterstützt alternative Feldnamen für E-Mail aus Webflow/Stripe Flows."""
+    raw = (
+        data.get("email")
+        or data.get("user_email")
+        or data.get("customer_email")
+        or data.get("zevix_email")
+        or (data.get("customer_details") or {}).get("email")
+        or (data.get("metadata") or {}).get("email")
+    )
+    return (str(raw or "").strip().lower())
+
 def extract_auth_until(data):
     """Unterstützt alternative Feldnamen für Laufzeit."""
     return data.get("auth_until", data.get("valid_until"))
@@ -225,7 +237,7 @@ def login():
 @zevix_bp.route("/zevix/update-subscription", methods=["POST"])
 def update_subscription():
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
+    email = extract_email(data)
     plan = extract_plan(data)
     auth_until = extract_auth_until(data)
 
@@ -269,7 +281,7 @@ def update_subscription():
 @zevix_bp.route("/zevix/consume-leads", methods=["POST"])
 def consume_leads():
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
+    email = extract_email(data)
     lead_ids = data.get("lead_ids")
     if lead_ids is None:
         lead_ids = data.get("ids")
@@ -373,7 +385,7 @@ def consume_leads():
 @zevix_bp.route("/zevix/session-sync", methods=["POST"])
 def session_sync():
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
+    email = extract_email(data)
 
     if not email:
         return jsonify({"success": False, "message": "email_missing"}), 400
@@ -382,7 +394,7 @@ def session_sync():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT plan, valid_until FROM users WHERE email=%s", (email,))
+            cur.execute("SELECT plan, valid_until FROM users WHERE lower(email)=lower(%s)", (email,))
             user = cur.fetchone()
             if not user:
                 return jsonify({"success": False, "message": "not_found"}), 404
@@ -396,7 +408,7 @@ def session_sync():
                 UPDATE users
                 SET plan=%s,
                     valid_until=COALESCE(valid_until, %s)
-                WHERE email=%s
+                WHERE lower(email)=lower(%s)
                 """,
                 (plan, auth_until, email)
             )
