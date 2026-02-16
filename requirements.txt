@@ -3,5 +3,3 @@ Flask-CORS
 gunicorn
 psycopg[binary]
 bcrypt
-pandas
-openpyxl
