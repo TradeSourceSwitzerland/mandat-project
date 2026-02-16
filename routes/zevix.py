@@ -33,11 +33,12 @@ def get_conn():
 # ----------------------------
 
 def load_all_leads():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(base_dir, "data")
+    # gehe vom routes/ Ordner zurück ins Projekt-Root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(project_root, "data")
 
     if not os.path.exists(data_dir):
-        raise RuntimeError("/data folder missing")
+        raise RuntimeError(f"/data folder missing at {data_dir}")
 
     files = [
         os.path.join(data_dir, f)
