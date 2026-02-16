@@ -212,6 +212,9 @@ def init_db():
 
         conn.commit()
 
+# ---------------------------- Blueprint für ZEVIX ----------------------------
+zevix_bp = Blueprint("zevix", __name__)
+
 # ---------------------------- REGISTER ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
