@@ -6,17 +6,12 @@ from flask import Blueprint, jsonify, request, send_file
 from datetime import datetime
 import pandas as pd
 import tempfile
-import requests
-from io import BytesIO
 
 # ----------------------------
 # CONFIG
 # ----------------------------
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-# 👉 DEINE WEBFLOW EXCEL DATEI
-EXCEL_URL = "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6981481c65c177045e58fbd2_shab_zefix_adressen_2026-02-03_0157.xlsx"
 
 
 # ----------------------------
@@ -26,10 +21,35 @@ EXCEL_URL = "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6981481
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL missing")
+
     return psycopg.connect(
         f"{DATABASE_URL}?sslmode=require",
         row_factory=dict_row
     )
+
+
+# ----------------------------
+# LOAD LOCAL EXCEL FILES
+# ----------------------------
+
+def load_all_leads():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+
+    if not os.path.exists(data_dir):
+        raise RuntimeError("/data folder missing")
+
+    files = [
+        os.path.join(data_dir, f)
+        for f in os.listdir(data_dir)
+        if f.endswith(".xlsx")
+    ]
+
+    if not files:
+        raise RuntimeError("No Excel files inside /data")
+
+    dfs = [pd.read_excel(f) for f in files]
+    return pd.concat(dfs, ignore_index=True)
 
 
 # ----------------------------
@@ -115,7 +135,7 @@ def register():
 
 
 # ----------------------------
-# LOGIN (auch ohne Abo erlaubt)
+# LOGIN
 # ----------------------------
 
 @zevix_bp.route("/zevix/login", methods=["POST"])
@@ -136,7 +156,7 @@ def login():
     if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return jsonify({"success": False}), 401
 
-    plan = user["plan"]  # darf NULL sein
+    plan = user["plan"]
 
     auth_until = user["valid_until"]
     if not auth_until:
@@ -144,6 +164,7 @@ def login():
 
     month = datetime.now().strftime("%Y-%m")
 
+    # ensure usage row exists
     cur.execute("""
         INSERT INTO usage (user_email,month,used)
         VALUES (%s,%s,0)
@@ -156,6 +177,7 @@ def login():
     )
     used = cur.fetchone()["used"]
 
+    conn.commit()
     cur.close()
     conn.close()
 
@@ -170,7 +192,7 @@ def login():
 
 
 # ----------------------------
-# EXPORT LEADS (nur mit Abo!)
+# EXPORT LEADS (Abo Pflicht)
 # ----------------------------
 
 PLAN_LIMITS = {
@@ -199,17 +221,16 @@ def export(email):
     cur.execute("""
         SELECT used FROM usage WHERE user_email=%s AND month=%s
     """, (email, month))
-    used = cur.fetchone()["used"]
+    result = cur.fetchone()
+
+    used = result["used"] if result else 0
 
     if used >= monthly_limit:
         return jsonify({"success": False, "message": "limit_reached"}), 403
 
 
-    # ✅ LOAD EXCEL FROM WEBFLOW CDN
-    response = requests.get(EXCEL_URL)
-    response.raise_for_status()
-
-    df = pd.read_excel(BytesIO(response.content))
+    # 🔐 LOAD LOCAL DATA (SECURE)
+    df = load_all_leads()
 
     df_export = df.sample(min(50, len(df)))
 
