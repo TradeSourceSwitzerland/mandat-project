@@ -365,6 +365,14 @@ def session_sync():
                 (email, month)
             )
 
+            # stellt sicher, dass alte/null Werte repariert werden
+            cur.execute("""
+                UPDATE usage
+                SET used = COALESCE(used, 0),
+                    used_ids = COALESCE(used_ids, '[]'::jsonb)
+                WHERE user_email=%s AND month=%s
+            """, (email, month))
+            
             cur.execute(
                 """
                 SELECT used, used_ids
