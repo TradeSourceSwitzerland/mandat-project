@@ -1,8 +1,7 @@
 Flask
 Flask-CORS
 gunicorn
-psycopg[binary]==3.2.3
-bcrypt==4.1.2
-pandas==2.2.2
-openpyxl==3.1.5
-# rebuild trigger
+psycopg[binary]
+bcrypt
+pandas
+openpyxl
