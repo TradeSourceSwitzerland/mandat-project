@@ -7,6 +7,7 @@ import stripe
 import jwt
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
+from hmac import compare_digest
 
 # ----------------------------
 # CONFIG
@@ -50,6 +51,43 @@ def create_jwt_token(email):
 def decode_jwt_token(token):
     return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
 
+
+def request_payload():
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        return data
+    if request.form:
+        return request.form.to_dict(flat=True)
+    return {}
+
+
+def find_user_by_email(cur, email):
+    cur.execute(
+        """
+        SELECT *
+        FROM users
+        WHERE lower(email)=%s
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (email.lower(),),
+    )
+    return cur.fetchone()
+
+
+def verify_password(password, stored_password):
+    if not stored_password:
+        return False, False
+
+    candidate = (password or "").encode()
+    stored = stored_password.encode()
+
+    try:
+        return bcrypt.checkpw(candidate, stored), False
+    except ValueError:
+        # Legacy fallback: allow plain text passwords and migrate on next login.
+        return compare_digest(password or "", stored_password), True
+
 def cookie_options():
     secure = request.is_secure
     if COOKIE_SECURE in {"true", "1", "yes", "on"}:
@@ -74,10 +112,11 @@ def load_user_session(email):
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE email=%s", (email,))
-            user = cur.fetchone()
+            user = find_user_by_email(cur, email)
             if not user:
                 return None
+
+            canonical_email = user["email"]
 
             plan = normalize_plan(user.get("plan"))
             auth_until = user.get("valid_until") or default_auth_until_ms()
@@ -90,7 +129,7 @@ def load_user_session(email):
                     valid_until=COALESCE(valid_until, %s)
                 WHERE email=%s
                 """,
-                (plan, auth_until, email),
+                (plan, auth_until, canonical_email),
             )
 
             # Usage row sicherstellen
@@ -100,7 +139,7 @@ def load_user_session(email):
                 VALUES (%s, %s, 0, '[]'::jsonb)
                 ON CONFLICT (user_email, month) DO NOTHING
                 """,
-                (email, month),
+                (canonical_email, month),
             )
 
             cur.execute(
@@ -109,7 +148,7 @@ def load_user_session(email):
                 FROM usage
                 WHERE user_email=%s AND month=%s
                 """,
-                (email, month),
+                (canonical_email, month),
             )
             usage = cur.fetchone() or {}
             used = int(usage.get("used") or 0)
@@ -118,7 +157,7 @@ def load_user_session(email):
         conn.commit()
 
     return {
-        "email": email,
+        "email": canonical_email,
         "plan": plan,
         "auth_until": auth_until,
         "month": month,
@@ -192,7 +231,7 @@ zevix_bp = Blueprint("zevix", __name__)
 # ----------------------------
 @zevix_bp.route("/zevix/register", methods=["POST"])
 def register():
-    data = request.get_json(silent=True) or {}
+    data = request_payload()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
@@ -224,7 +263,7 @@ def register():
 # ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
-    data = request.get_json(silent=True) or {}
+    data = request_payload()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
@@ -233,13 +272,21 @@ def login():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE email=%s", (email,))
-            user = cur.fetchone()
+            user = find_user_by_email(cur, email)
             if not user:
                 return jsonify({"success": False, "message": "not_found"}), 404
 
-            if not bcrypt.checkpw(password.encode(), user["password"].encode()):
+            ok, legacy_plaintext = verify_password(password, user.get("password"))
+            if not ok:
                 return jsonify({"success": False, "message": "wrong_password"}), 401
+
+            if legacy_plaintext:
+                cur.execute(
+                    "UPDATE users SET password=%s WHERE email=%s",
+                    (bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(), user["email"]),
+                )
+
+        conn.commit()
 
     session = load_user_session(email)
     if not session:
@@ -277,7 +324,7 @@ def login():
 
 @zevix_bp.route("/zevix/session-sync", methods=["POST"])
 def session_sync():
-    data = request.get_json(silent=True) or {}
+    data = request_payload()
     token = (data.get("token") or "").strip()
     email = (data.get("email") or "").strip().lower()
 
