@@ -45,6 +45,7 @@ def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
 
+            
             # USERS TABLE
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -56,13 +57,13 @@ def init_db():
                 );
             """)
 
-            # Migration safety für alte DB (wichtig!)
+            # 🔥 Migration safety (sehr wichtig für Render!)
             cur.execute("""
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS valid_until BIGINT
             """)
 
-            # Alte User ohne valid_until reparieren (Migration Backfill)
+            # 🔥 Alte User reparieren (Backfill)
             cur.execute("""
                 UPDATE users
                 SET valid_until = %s
