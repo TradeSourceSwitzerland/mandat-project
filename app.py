@@ -43,6 +43,15 @@ EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
 def show_mandat_form():
     return render_template("mandat.html")
 
+@app.route("/login")
+def show_login():
+    return render_template("login.html")
+
+
+@app.route("/dashboard")
+def show_dashboard():
+    return render_template("dashboard.html")
+
 # ----------------------------
 # API: PDF per Mail versenden
 # ----------------------------
