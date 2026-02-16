@@ -311,3 +311,13 @@ def fix_db_once():
     finally:
         cur.close()
         conn.close()
+
+# ----------------------------
+# INIT DB BEIM APP START (nicht beim Request!)
+# ----------------------------
+print("🔵 Initializing database once at startup...")
+try:
+    init_db()
+    print("✅ Database ready")
+except Exception as e:
+    print("❌ DB INIT FAILED:", e)
