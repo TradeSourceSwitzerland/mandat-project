@@ -18,6 +18,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Dein geheimen Schlüs
 # Cookie-Verhalten über ENV steuerbar, damit Login lokal und in Prod stabil funktioniert.
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "auto").strip().lower()
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "auto").strip().lower()
+COOKIE_DOMAIN = (os.getenv("COOKIE_DOMAIN") or "").strip() or None
+COOKIE_HTTPONLY = os.getenv("COOKIE_HTTPONLY", "false").strip().lower() in {"true", "1", "yes", "on"}
 
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
@@ -104,13 +106,17 @@ def cookie_options():
     else:
         samesite = "None" if secure else "Lax"
 
-    return {
+    opts = {
         "secure": secure,
         "samesite": samesite,
-        "domain": "www.zevix.ch",  # Setze die Domain explizit
         "max_age": 30 * 24 * 60 * 60,
     }
 
+    if COOKIE_DOMAIN:
+        opts["domain"] = COOKIE_DOMAIN
+
+    return opts
+    
 
 def load_user_session(email):
     month = get_month_key()
@@ -278,7 +284,7 @@ def login():
     response.set_cookie(
         "auth_token",
         token,
-        httponly=True,
+        httponly=COOKIE_HTTPONLY,
         **cookie_cfg,
     )  # 30 Tage
 
@@ -294,6 +300,28 @@ def login():
     )
 
     return response
+
+# ---------------------------- SESSION SYNC ----------------------------
+@zevix_bp.route("/zevix/session-sync", methods=["POST"])
+def session_sync():
+    data = request_payload()
+    token = (data.get("token") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+
+    if token:
+        payload = decode_jwt_token(token)
+        if not payload:
+            return jsonify({"success": False, "message": "invalid_token"}), 401
+        email = (payload.get("email") or "").strip().lower()
+
+    if not email:
+        return jsonify({"success": False, "message": "missing_identity"}), 400
+
+    session = load_user_session(email)
+    if not session:
+        return jsonify({"success": False, "message": "not_found"}), 404
+
+    return jsonify({"success": True, **session})
 
 
 # ---------------------------- STARTING THE FLASK APP ----------------------------
