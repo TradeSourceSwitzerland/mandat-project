@@ -15,6 +15,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # Dein Stripe-Secret-Key
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Dein geheimen Schlüssel für JWT
 
+# Cookie-Verhalten über ENV steuerbar, damit Login lokal und in Prod stabil funktioniert.
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "auto").strip().lower()
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "auto").strip().lower()
+
 VALID_PLANS = {"none", "basic", "business", "enterprise"}
 
 # ----------------------------
@@ -46,6 +50,24 @@ def create_jwt_token(email):
 def decode_jwt_token(token):
     return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
 
+def cookie_options():
+    secure = request.is_secure
+    if COOKIE_SECURE in {"true", "1", "yes", "on"}:
+        secure = True
+    elif COOKIE_SECURE in {"false", "0", "no", "off"}:
+        secure = False
+
+    if COOKIE_SAMESITE in {"lax", "strict", "none"}:
+        samesite = COOKIE_SAMESITE.capitalize()
+    else:
+        # SameSite=None verlangt Secure=True. Für HTTP-Fälle (lokal/dev) auf Lax fallen.
+        samesite = "None" if secure else "Lax"
+
+    return {
+        "secure": secure,
+        "samesite": samesite,
+        "max_age": 30 * 24 * 60 * 60,
+    }
 
 def load_user_session(email):
     month = get_month_key()
@@ -230,28 +252,24 @@ def login():
     response = jsonify({"success": True, **session, "token": token})
 
     # JWT als Cookie setzen (HttpOnly und Secure)
+    cookie_cfg = cookie_options()
+
     response.set_cookie(
         "auth_token",
         token,
         httponly=True,
-        secure=True,
-        samesite="None",
-        max_age=30 * 24 * 60 * 60,
+        **cookie_cfg,
     )  # 30 Tage
     # UI-Cookies für bestehende Webflow-Embeds
     response.set_cookie(
         "zevix_email",
         session["email"],
-        secure=True,
-        samesite="None",
-        max_age=30 * 24 * 60 * 60,
+        **cookie_cfg,
     )
     response.set_cookie(
         "plan",
         session["plan"],
-        secure=True,
-        samesite="None",
-        max_age=30 * 24 * 60 * 60,
+        **cookie_cfg,
     )
 
     return response
@@ -278,19 +296,16 @@ def session_sync():
         return jsonify({"success": False, "message": "not_found"}), 404
 
     response = jsonify({"success": True, **session})
+    cookie_cfg = cookie_options()
     response.set_cookie(
         "zevix_email",
         session["email"],
-        secure=True,
-        samesite="None",
-        max_age=30 * 24 * 60 * 60,
+        **cookie_cfg,
     )
     response.set_cookie(
         "plan",
         session["plan"],
-        secure=True,
-        samesite="None",
-        max_age=30 * 24 * 60 * 60,
+        **cookie_cfg,
     )
     return response
 
