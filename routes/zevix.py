@@ -56,6 +56,19 @@ def init_db():
                 );
             """)
 
+            # Migration safety für alte DB (wichtig!)
+            cur.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS valid_until BIGINT
+            """)
+
+            # Alte User ohne valid_until reparieren (Migration Backfill)
+            cur.execute("""
+                UPDATE users
+                SET valid_until = %s
+                WHERE valid_until IS NULL
+            """, (default_auth_until_ms(),))
+
             # USAGE TABLE
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS usage (
