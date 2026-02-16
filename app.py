@@ -52,6 +52,10 @@ def show_login():
 def show_dashboard():
     return render_template("dashboard.html")
 
+@app.route("/leads")
+def show_leads():
+    return render_template("leads.html")
+
 # ----------------------------
 # API: PDF per Mail versenden
 # ----------------------------
