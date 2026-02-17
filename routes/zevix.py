@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 import bcrypt
 import jwt
 import psycopg
@@ -31,6 +32,14 @@ STRIPE_PLAN_CACHE_LOCK = Lock()
 # Request deduplication for concurrent calls
 ACTIVE_STRIPE_REQUESTS = {}
 ACTIVE_STRIPE_REQUESTS_LOCK = Lock()
+
+# Lead limits by plan
+LEAD_LIMITS = {
+    "none": 0,
+    "basic": 10,
+    "business": 50,
+    "enterprise": float('inf'),  # unlimited
+}
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -162,11 +171,11 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
             if old_plan != new_plan:
                 cur.execute(
                     """
-                    UPDATE usage
-                    SET plan = %s
-                    WHERE user_email = %s
+                    UPDATE users
+                    SET plan = %s, valid_until = %s
+                    WHERE lower(email) = %s
                     """,
-                    (new_plan, email),
+                    (new_plan, default_auth_until_ms(), email),
                 )
                 conn.commit()
 
@@ -797,3 +806,144 @@ def cache_stats():
             "expected_api_reduction": "60-80%",
         }
     })
+
+
+# ---------------------------- EXPORT ENDPOINT (LEAD CONSUMPTION) ----------------------------
+@zevix_bp.route("/zevix/export", methods=["POST"])
+def export_lead():
+    """
+    Export/consume a lead for the logged-in user.
+    
+    Expected payload:
+    {
+        "lead_id": "unique_lead_identifier",
+        "lead_data": { ... optional lead metadata ... }
+    }
+    
+    Returns:
+    - Success: {"success": true, "used": N, "remaining": M, "month": "YYYY-MM"}
+    - Error: {"success": false, "error": "error_code", "message": "human readable message"}
+    """
+    # Check authentication
+    email = session.get("email")
+    if not email:
+        return jsonify({"success": False, "error": "not_authenticated", "message": "User must be logged in"}), 401
+    
+    data = request_payload()
+    lead_id = str(data.get("lead_id") or "").strip()
+    
+    if not lead_id:
+        return jsonify({"success": False, "error": "missing_lead_id", "message": "lead_id is required"}), 400
+    
+    month = get_month_key()
+    
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                # Get user's current plan
+                cur.execute(
+                    """
+                    SELECT plan
+                    FROM users
+                    WHERE lower(email) = %s
+                    """,
+                    (email.lower(),),
+                )
+                user_data = cur.fetchone()
+                
+                if not user_data:
+                    return jsonify({"success": False, "error": "user_not_found", "message": "User not found"}), 404
+                
+                plan = normalize_plan(user_data.get("plan"))
+                
+                # Get plan limit
+                plan_limit = LEAD_LIMITS.get(plan, 0)
+                
+                if plan_limit == 0:
+                    return jsonify({
+                        "success": False,
+                        "error": "no_plan",
+                        "message": "You need a subscription plan to export leads"
+                    }), 403
+                
+                # Ensure usage record exists for this month
+                cur.execute(
+                    """
+                    INSERT INTO usage (user_email, month, used, used_ids)
+                    VALUES (%s, %s, 0, '[]'::jsonb)
+                    ON CONFLICT (user_email, month) DO NOTHING
+                    """,
+                    (email, month),
+                )
+                
+                # Get current usage for this month
+                cur.execute(
+                    """
+                    SELECT used, used_ids
+                    FROM usage
+                    WHERE user_email = %s AND month = %s
+                    """,
+                    (email, month),
+                )
+                usage_data = cur.fetchone()
+                
+                if not usage_data:
+                    return jsonify({"success": False, "error": "internal_error", "message": "Failed to retrieve usage data"}), 500
+                
+                used = int(usage_data.get("used") or 0)
+                used_ids = usage_data.get("used_ids") or []
+                
+                # Check if lead was already exported (idempotent operation)
+                if lead_id in used_ids:
+                    remaining = plan_limit - used if plan_limit != float('inf') else float('inf')
+                    return jsonify({
+                        "success": True,
+                        "used": used,
+                        "remaining": remaining if remaining != float('inf') else "unlimited",
+                        "month": month,
+                        "message": "Lead already exported this month"
+                    })
+                
+                # Check if user has reached limit
+                if used >= plan_limit:
+                    return jsonify({
+                        "success": False,
+                        "error": "monthly_limit_exceeded",
+                        "message": f"You have 0 leads remaining. Your {plan} plan allows {plan_limit} leads per month."
+                    }), 403
+                
+                # Increment usage and add lead_id to used_ids
+                new_used = used + 1
+                new_used_ids = used_ids + [lead_id]
+                
+                cur.execute(
+                    """
+                    UPDATE usage
+                    SET used = %s, used_ids = %s::jsonb
+                    WHERE user_email = %s AND month = %s
+                    """,
+                    (new_used, json.dumps(new_used_ids), email, month),
+                )
+                conn.commit()
+                
+                remaining = plan_limit - new_used if plan_limit != float('inf') else float('inf')
+                
+                logging.info(
+                    "Lead exported successfully, email=%s, lead_id=%s, month=%s, used=%d/%s",
+                    email,
+                    lead_id,
+                    month,
+                    new_used,
+                    plan_limit if plan_limit != float('inf') else "unlimited",
+                )
+                
+                return jsonify({
+                    "success": True,
+                    "used": new_used,
+                    "remaining": remaining if remaining != float('inf') else "unlimited",
+                    "month": month,
+                })
+                
+    except Exception as exc:
+        logging.error("Error in export endpoint, email=%s, lead_id=%s, error=%s", email, lead_id, exc)
+        return jsonify({"success": False, "error": "internal_error", "message": str(exc)}), 500
