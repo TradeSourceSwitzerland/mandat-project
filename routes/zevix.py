@@ -36,86 +36,6 @@ def normalize_email_candidate(value: str | None) -> str:
         return ""
     return email
 
-def default_auth_until_ms() -> int:
-    return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
-
-
-def get_month_key() -> str:
-    return datetime.now().strftime("%Y-%m")
-
-
-def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
-    expiration = datetime.utcnow() + timedelta(days=30)
-    payload = {
-        "email": email,
-        "plan": normalize_plan(plan),
-        "valid_until": valid_until,
-        "exp": expiration,
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-
-
-def request_payload() -> dict:
-    data = request.get_json(silent=True)
-    if isinstance(data, dict):
-        return data
-    if request.form:
-        return request.form.to_dict(flat=True)
-    return {}
-
-
-def resolve_session_id(data: dict) -> str:
-    payload_session_id = str(data.get("session_id") or "").strip()
-    query_session_id = str(request.args.get("session_id") or "").strip()
-    return payload_session_id or query_session_id
-
-
-def find_user_by_email(cur, email: str) -> dict | None:
-    cur.execute(
-        """
-        SELECT *
-        FROM users
-        WHERE lower(email)=%s
-        ORDER BY id ASC
-        LIMIT 1
-        """,
-        (email.lower(),),
-    )
-    return cur.fetchone()
-
-
-def verify_password(password: str, stored_password: str | None) -> bool:
-    if not stored_password:
-        return False
-    candidate = (password or "").encode()
-    stored = stored_password.encode()
-    try:
-        return bcrypt.checkpw(candidate, stored)
-    except ValueError:
-        return compare_digest(password or "", stored_password)
-
-
-def get_conn():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL fehlt")
-    return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
-
-
-def configured_price_plan_map() -> dict[str, str]:
-    mapping = dict(DEFAULT_PLAN_BY_PRICE_ID)
-    env_map = {
-        os.getenv("STRIPE_PRICE_BASIC"): "basic",
-        os.getenv("STRIPE_PRICE_BUSINESS"): "business",
-        os.getenv("STRIPE_PRICE_ENTERPRISE"): "enterprise",
-        os.getenv("STRIPE_PRODUCT_BASIC"): "basic",
-        os.getenv("STRIPE_PRODUCT_BUSINESS"): "business",
-        os.getenv("STRIPE_PRODUCT_ENTERPRISE"): "enterprise",
-    }
-    for price_id, plan in env_map.items():
-        if price_id:
-            mapping[price_id] = plan
-    return mapping
-
 
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     email = normalize_email_candidate(checkout_session.get("customer_email"))
@@ -152,81 +72,6 @@ def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     return ""
 
 
-def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
-    email = resolve_email_from_checkout_session(checkout_session)
-    if not email:
-        return False, "missing_customer_email"
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT plan FROM users WHERE lower(email)=%s", (email,))
-            user_row = cur.fetchone()
-            if not user_row:
-                return False, "user_not_found"
-
-            old_plan = normalize_plan(user_row.get("plan"))
-            new_plan = resolve_plan_from_checkout_session(checkout_session)
-
-            # Niemals auf none downgraden, wenn keine belastbare Plan-Info vorliegt
-            if new_plan == "none":
-                new_plan = old_plan
-
-            if old_plan != new_plan:
-                cur.execute(
-                    """
-                    UPDATE usage
-                    SET used = 0, used_ids = '[]'::jsonb
-                    WHERE user_email=%s
-                    """,
-                    (email,),
-                )
-
-            cur.execute(
-                """
-                UPDATE users
-                SET plan=%s, valid_until=%s
-                WHERE lower(email)=%s
-                """,
-                (new_plan, default_auth_until_ms(), email),
-            )
-        conn.commit()
-
-    return True, "ok"
-
-
-def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
-    # 1) bevorzugt metadata.plan
-    metadata_plan = normalize_plan((checkout_session.get("metadata") or {}).get("plan"))
-    if metadata_plan != "none":
-        return metadata_plan
-
-    # 2) fallback via Stripe Price-ID (robuster für Payment Links)
-    plan_by_price_id = configured_price_plan_map()
-    line_items = (checkout_session.get("line_items") or {}).get("data")
-    if not line_items:
-        session_id = checkout_session.get("id")
-        if not session_id:
-            return "none"
-
-        try:
-            line_items = stripe.checkout.Session.list_line_items(session_id, limit=10).get("data", [])
-        except Exception as exc:
-            logging.warning("Stripe line items konnten nicht geladen werden: %s", exc)
-            return "none"
-
-    for item in line_items:
-        price = item.get("price") or {}
-        price_id = price.get("id")
-        product_id = price.get("product")
-        resolved = normalize_plan(
-            plan_by_price_id.get(price_id) or plan_by_price_id.get(product_id)
-        )
-        if resolved != "none":
-            return resolved
-
-    return "none"
-
-
 def plan_rank(plan: str) -> int:
     order = {"none": 0, "basic": 1, "business": 2, "enterprise": 3}
     return order.get(normalize_plan(plan), 0)
@@ -252,12 +97,8 @@ def resolve_plan_from_subscription(subscription: dict) -> str:
     return best_plan
 
 
-def sync_user_plan_from_stripe_if_needed(email: str, current_plan: str) -> str:
+def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
     normalized_current_plan = normalize_plan(current_plan)
-
-    # Nur heilen, wenn lokal kein verwertbarer Plan vorliegt.
-    if normalized_current_plan != "none":
-        return normalized_current_plan
 
     if not stripe.api_key:
         return normalized_current_plan
@@ -303,8 +144,6 @@ def sync_user_plan_from_stripe_if_needed(email: str, current_plan: str) -> str:
             return normalized_current_plan
 
     return best_plan
-
-
 
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
@@ -371,11 +210,12 @@ def login():
             plan = normalize_plan(user_data.get("plan"))
             valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
 
-            # Falls Checkout-Sync vorher nicht sauber durchlief, beim Login aus Stripe heilen.
-            healed_plan = sync_user_plan_from_stripe_if_needed(email, plan)
-            if healed_plan != plan:
-                plan = healed_plan
+            # Bei jedem Login Plan mit Stripe abgleichen, damit stale Status korrigiert wird.
+            reconciled_plan = sync_user_plan_from_stripe(email, plan)
+            if reconciled_plan != plan:
+                plan = reconciled_plan
                 valid_until = default_auth_until_ms()
+
 
             cur.execute(
                 """
