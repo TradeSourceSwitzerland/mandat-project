@@ -663,8 +663,28 @@ def export_lead():
     - Enforces plan-based limits (basic=500, business=1000, enterprise=4500)
     - Updates usage counters and tracks used lead IDs
     """
-    # Check if user is logged in
-    user_email = session.get("email")
+    # Check if user is logged in (via Bearer token or session)
+    # Try Bearer token from Authorization header first
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()  # Remove "Bearer " prefix (case-insensitive)
+    
+    user_email = None
+    
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_email = payload.get("email")
+        except jwt.ExpiredSignatureError:
+            logging.warning("JWT token expired for export-lead request")
+        except jwt.InvalidTokenError:
+            logging.warning("Invalid JWT token for export-lead request")
+    
+    # Fall back to session-based authentication
+    if not user_email:
+        user_email = session.get("email")
+    
     if not user_email:
         return jsonify({"success": False, "error": "not_authenticated"}), 401
     
