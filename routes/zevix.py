@@ -42,6 +42,14 @@ LEAD_LIMITS = {
 }
 
 # ---------------------------- HELPERS ----------------------------
+def calculate_remaining_leads(plan_limit: float, used: int) -> int | float | str:
+    """Calculate remaining leads for display purposes."""
+    if plan_limit == float('inf'):
+        return "unlimited"
+    remaining = plan_limit - used
+    return remaining if remaining != float('inf') else "unlimited"
+
+
 def normalize_plan(plan: str | None) -> str:
     value = str(plan or "none").strip().lower()
     return value if value in VALID_PLANS else "none"
@@ -850,7 +858,7 @@ def export_lead():
                     FROM users
                     WHERE lower(email) = %s
                     """,
-                    (email.lower(),),
+                    (email,),
                 )
                 user_data = cur.fetchone()
                 
@@ -898,11 +906,11 @@ def export_lead():
                 
                 # Check if lead was already exported (idempotent operation)
                 if lead_id in used_ids:
-                    remaining = plan_limit - used if plan_limit != float('inf') else float('inf')
+                    remaining = calculate_remaining_leads(plan_limit, used)
                     return jsonify({
                         "success": True,
                         "used": used,
-                        "remaining": remaining if remaining != float('inf') else "unlimited",
+                        "remaining": remaining,
                         "month": month,
                         "message": "Lead already exported this month"
                     })
@@ -929,7 +937,7 @@ def export_lead():
                 )
                 conn.commit()
                 
-                remaining = plan_limit - new_used if plan_limit != float('inf') else float('inf')
+                remaining = calculate_remaining_leads(plan_limit, new_used)
                 
                 logging.info(
                     "Lead exported successfully, email=%s, lead_id=%s, month=%s, used=%d/%s",
@@ -943,7 +951,7 @@ def export_lead():
                 return jsonify({
                     "success": True,
                     "used": new_used,
-                    "remaining": remaining if remaining != float('inf') else "unlimited",
+                    "remaining": remaining,
                     "month": month,
                 })
                 
