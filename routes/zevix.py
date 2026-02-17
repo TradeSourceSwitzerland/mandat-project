@@ -175,7 +175,7 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
                     SET plan = %s, valid_until = %s
                     WHERE lower(email) = %s
                     """,
-                    (new_plan, default_auth_until_ms(), email),
+                    (new_plan, default_auth_until_ms(), email.lower()),
                 )
                 conn.commit()
 
@@ -828,6 +828,9 @@ def export_lead():
     email = session.get("email")
     if not email:
         return jsonify({"success": False, "error": "not_authenticated", "message": "User must be logged in"}), 401
+    
+    # Normalize email to lowercase for consistency
+    email = email.lower()
     
     data = request_payload()
     lead_id = str(data.get("lead_id") or "").strip()
