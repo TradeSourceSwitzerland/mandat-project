@@ -112,6 +112,35 @@ def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     email = (checkout_session.get("customer_email") or "").strip().lower()
     if email:
         return email
+        
+    customer_details = checkout_session.get("customer_details") or {}
+    email = str(customer_details.get("email") or "").strip().lower()
+    if email:
+        return email
+
+    metadata = checkout_session.get("metadata") or {}
+    for key in ("email", "user_email", "customer_email"):
+        email = str(metadata.get(key) or "").strip().lower()
+        if email:
+            return email
+
+    # Fallback: Einige Payment-Links speichern die User-Identität in client_reference_id.
+    client_reference_id = str(checkout_session.get("client_reference_id") or "").strip().lower()
+    if "@" in client_reference_id:
+        return client_reference_id
+
+    # Letzter Versuch: E-Mail über Stripe Customer auflösen.
+    customer_id = str(checkout_session.get("customer") or "").strip()
+    if customer_id:
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            email = str(customer.get("email") or "").strip().lower()
+            if email:
+                return email
+        except Exception as exc:
+            logging.warning("Stripe customer lookup fehlgeschlagen, customer_id=%s, error=%s", customer_id, exc)
+
+    return ""
     customer_details = checkout_session.get("customer_details") or {}
     return str(customer_details.get("email") or "").strip().lower()
 
