@@ -731,7 +731,7 @@ def export_lead():
                 (user_email, month),
             )
             usage = cur.fetchone() or {}
-            used = int(usage.get("used") or 0)
+            used = int(usage.get("used", 0))
             used_ids_raw = usage.get("used_ids")
             
             # Ensure used_ids is a list (handle both JSONB and string cases)
