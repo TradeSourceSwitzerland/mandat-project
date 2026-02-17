@@ -286,7 +286,7 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
 
 
 def find_user_by_email(cur, email: str) -> dict | None:
-    cur.execute("SELECT email, password FROM users WHERE lower(email)=%s", (email,))
+    cur.execute("SELECT email, password FROM users WHERE lower(email)=%s", (email.lower(),))
     return cur.fetchone()
 
 
@@ -450,11 +450,11 @@ def refresh_token():
                 FROM users
                 WHERE lower(email)=%s
                 """,
-                (email,),
+                (email.lower(),),
             )
-            user_data = cur.fetchone() or {}
+            user_data = cur.fetchone()
             
-            if not user_data:
+            if user_data is None:
                 return jsonify({"success": False, "message": "user_not_found"}), 404
             
             plan = normalize_plan(user_data.get("plan"))
@@ -477,7 +477,6 @@ def refresh_token():
             usage = cur.fetchone() or {}
             used = int(usage.get("used") or 0)
             used_ids = usage.get("used_ids") or []
-        conn.commit()
     
     new_token = create_jwt_token(email, plan, valid_until)
     
