@@ -666,7 +666,7 @@ def export_lead():
     # Check if user is logged in (via Bearer token or session)
     # Try Bearer token from Authorization header first
     auth_header = request.headers.get("Authorization", "")
-    token = ""
+    token = None
     if auth_header and auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()  # Remove "Bearer " prefix (case-insensitive)
     
