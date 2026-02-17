@@ -64,7 +64,9 @@ def request_payload() -> dict:
 
 
 def verify_password(password: str, stored_password: str | None) -> bool:
-    return compare_digest(bcrypt.hashpw(password.encode(), stored_password.encode()) if stored_password else b"", stored_password.encode())
+    if not stored_password:
+        return False
+    return bcrypt.checkpw(password.encode(), stored_password.encode())
 
 
 def get_conn():
@@ -283,6 +285,15 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
     return reconciled_plan
 
 
+def find_user_by_email(cur, email: str) -> dict | None:
+    cur.execute("SELECT email, password FROM users WHERE lower(email)=%s", (email,))
+    return cur.fetchone()
+
+
+def resolve_session_id(data: dict) -> str:
+    return str(data.get("session_id") or data.get("sessionId") or "").strip()
+
+
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
 
@@ -401,6 +412,95 @@ def login():
     session["used"] = used
     session["used_ids"] = used_ids
 
+    return response
+
+
+# ---------------------------- LOGOUT ----------------------------
+@zevix_bp.route("/zevix/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"success": True, "message": "logged_out"})
+
+
+# ---------------------------- REFRESH TOKEN ----------------------------
+@zevix_bp.route("/zevix/refresh-token", methods=["POST"])
+def refresh_token():
+    data = request_payload()
+    token = data.get("token") or session.get("auth_token") or ""
+    
+    if not token:
+        return jsonify({"success": False, "message": "missing_token"}), 400
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("email")
+        if not email:
+            return jsonify({"success": False, "message": "invalid_token"}), 401
+    except jwt.ExpiredSignatureError:
+        return jsonify({"success": False, "message": "token_expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"success": False, "message": "invalid_token"}), 401
+    
+    month = get_month_key()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT plan, valid_until
+                FROM users
+                WHERE lower(email)=%s
+                """,
+                (email,),
+            )
+            user_data = cur.fetchone() or {}
+            
+            if not user_data:
+                return jsonify({"success": False, "message": "user_not_found"}), 404
+            
+            plan = normalize_plan(user_data.get("plan"))
+            valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
+            
+            # Sync plan with Stripe
+            reconciled_plan = sync_user_plan_from_stripe(email, plan)
+            if reconciled_plan != plan:
+                plan = reconciled_plan
+                valid_until = default_auth_until_ms()
+            
+            cur.execute(
+                """
+                SELECT used, used_ids
+                FROM usage
+                WHERE user_email=%s AND month=%s
+                """,
+                (email, month),
+            )
+            usage = cur.fetchone() or {}
+            used = int(usage.get("used") or 0)
+            used_ids = usage.get("used_ids") or []
+        conn.commit()
+    
+    new_token = create_jwt_token(email, plan, valid_until)
+    
+    response = jsonify(
+        {
+            "success": True,
+            "email": email,
+            "plan": plan,
+            "valid_until": valid_until,
+            "auth_until": valid_until,
+            "month": month,
+            "used": used,
+            "used_ids": used_ids,
+            "token": new_token,
+        }
+    )
+    
+    session["auth_token"] = new_token
+    session["email"] = email
+    session["plan"] = plan
+    session["used"] = used
+    session["used_ids"] = used_ids
+    
     return response
 
 
