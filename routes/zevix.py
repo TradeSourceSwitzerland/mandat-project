@@ -666,16 +666,20 @@ def export_lead():
     # Check if user is logged in (via Bearer token or session)
     # Try Bearer token from Authorization header first
     auth_header = request.headers.get("Authorization", "")
-    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    token = ""
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()  # Remove "Bearer " prefix (case-insensitive)
+    
     user_email = None
     
     if token:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_email = payload.get("email")
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-            # Token invalid or expired, will try session fallback
-            pass
+        except jwt.ExpiredSignatureError:
+            logging.warning("JWT token expired for export-lead request")
+        except jwt.InvalidTokenError:
+            logging.warning("Invalid JWT token for export-lead request")
     
     # Fall back to session-based authentication
     if not user_email:
