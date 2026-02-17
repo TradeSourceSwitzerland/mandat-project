@@ -4,10 +4,12 @@ import bcrypt
 import jwt
 import psycopg
 import stripe
+import time
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, session
 from hmac import compare_digest
 from psycopg.rows import dict_row
+from threading import Lock
 
 # ---------------------------- CONFIG ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -20,6 +22,15 @@ DEFAULT_PLAN_BY_PRICE_ID = {
     "prod_TxPABMR85vBl2U": "business",    # Live-Preis-ID für Business
     "prod_TxPAEQ2MB1FblT": "basic",       # Live-Preis-ID für Basic
 }
+
+# Cache for Stripe plan syncs (in-memory with TTL)
+STRIPE_PLAN_CACHE = {}
+STRIPE_PLAN_CACHE_TTL = 300  # 5 minutes
+STRIPE_PLAN_CACHE_LOCK = Lock()
+
+# Request deduplication for concurrent calls
+ACTIVE_STRIPE_REQUESTS = {}
+ACTIVE_STRIPE_REQUESTS_LOCK = Lock()
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -230,62 +241,112 @@ def resolve_plan_from_subscription(subscription: dict) -> tuple[str, tuple[int, 
     return best_plan, score
 
 
-def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
+def sync_user_plan_from_stripe(email: str, current_plan: str, force: bool = False) -> str:
+    """
+    Syncs user plan from Stripe with caching and optimization.
+    
+    Args:
+        email: User email
+        current_plan: Current plan from database
+        force: If True, bypass cache and force fresh lookup
+    
+    Returns:
+        Reconciled plan name
+    """
     normalized_current_plan = normalize_plan(current_plan)
 
     if not stripe.api_key:
         logging.warning("STRIPE_SECRET_KEY fehlt: Stripe-Reconciliation deaktiviert, email=%s", email)
         return normalized_current_plan
 
+    # Check cache first (unless forced)
+    if not force:
+        cached_plan, cache_hit = get_cached_stripe_plan(email)
+        if cache_hit:
+            # Return cached plan, but only if it's not a downgrade to "none"
+            # (we never downgrade from a paid plan to none based on cache alone)
+            if cached_plan != "none" or normalized_current_plan == "none":
+                return cached_plan
+
+    # Request deduplication: check if another request is already processing this email
+    with ACTIVE_STRIPE_REQUESTS_LOCK:
+        if email in ACTIVE_STRIPE_REQUESTS:
+            # Another request is already syncing this user, return current plan
+            # to avoid duplicate API calls
+            logging.debug("Deduplication: Stripe sync already in progress for email=%s", email)
+            return normalized_current_plan
+        # Mark this email as being processed
+        ACTIVE_STRIPE_REQUESTS[email] = time.time()
+
     try:
-        customers = stripe.Customer.list(email=email, limit=5).get("data", [])
-    except Exception as exc:
-        logging.warning("Stripe Customer-Suche fehlgeschlagen, email=%s, error=%s", email, exc)
-        return normalized_current_plan
-
-    best_candidate: tuple[str, tuple[int, int, int, int]] | None = None
-
-    for customer in customers:
-        customer_id = str(customer.get("id") or "").strip()
-        if not customer_id:
-            continue
-
+        start_time = time.time()
+        
+        # Perform Stripe API calls
         try:
-            subscriptions = stripe.Subscription.list(customer=customer_id, status="all", limit=20).get("data", [])
+            customers = stripe.Customer.list(email=email, limit=5).get("data", [])
         except Exception as exc:
-            logging.warning("Stripe Subscriptions konnten nicht geladen werden, customer_id=%s, error=%s", customer_id, exc)
-            continue
-
-        for subscription in subscriptions:
-            candidate = resolve_plan_from_subscription(subscription)
-            if not candidate:
-                continue
-            if best_candidate is None or candidate[1] > best_candidate[1]:
-                best_candidate = candidate
-
-    if best_candidate is None:
-        return normalized_current_plan
-
-    reconciled_plan = normalize_plan(best_candidate[0])
-
-    if reconciled_plan != normalized_current_plan:
-        try:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        UPDATE users
-                        SET plan=%s, valid_until=%s
-                        WHERE lower(email)=%s
-                        """,
-                        (reconciled_plan, default_auth_until_ms(), email),
-                    )
-                conn.commit()
-        except Exception as exc:
-            logging.warning("Lokales Plan-Reconciliation fehlgeschlagen, email=%s, error=%s", email, exc)
+            logging.warning("Stripe Customer-Suche fehlgeschlagen, email=%s, error=%s", email, exc)
             return normalized_current_plan
 
-    return reconciled_plan
+        best_candidate: tuple[str, tuple[int, int, int, int]] | None = None
+
+        for customer in customers:
+            customer_id = str(customer.get("id") or "").strip()
+            if not customer_id:
+                continue
+
+            try:
+                subscriptions = stripe.Subscription.list(customer=customer_id, status="all", limit=20).get("data", [])
+            except Exception as exc:
+                logging.warning("Stripe Subscriptions konnten nicht geladen werden, customer_id=%s, error=%s", customer_id, exc)
+                continue
+
+            for subscription in subscriptions:
+                candidate = resolve_plan_from_subscription(subscription)
+                if not candidate:
+                    continue
+                if best_candidate is None or candidate[1] > best_candidate[1]:
+                    best_candidate = candidate
+
+        if best_candidate is None:
+            # No active subscription found, cache the current plan
+            set_cached_stripe_plan(email, normalized_current_plan)
+            elapsed = time.time() - start_time
+            logging.info("Stripe sync completed (no subscription), email=%s, elapsed=%.3fs", email, elapsed)
+            return normalized_current_plan
+
+        reconciled_plan = normalize_plan(best_candidate[0])
+
+        # Cache the result
+        set_cached_stripe_plan(email, reconciled_plan)
+
+        elapsed = time.time() - start_time
+        logging.info("Stripe sync completed, email=%s, plan=%s, elapsed=%.3fs", email, reconciled_plan, elapsed)
+
+        # Update database if plan changed
+        if reconciled_plan != normalized_current_plan:
+            try:
+                with get_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET plan=%s, valid_until=%s
+                            WHERE lower(email)=%s
+                            """,
+                            (reconciled_plan, default_auth_until_ms(), email),
+                        )
+                    conn.commit()
+            except Exception as exc:
+                logging.warning("Lokales Plan-Reconciliation fehlgeschlagen, email=%s, error=%s", email, exc)
+                return normalized_current_plan
+
+        return reconciled_plan
+        
+    finally:
+        # Remove email from active requests
+        with ACTIVE_STRIPE_REQUESTS_LOCK:
+            ACTIVE_STRIPE_REQUESTS.pop(email, None)
 
 
 def find_user_by_email(cur, email: str) -> dict | None:
@@ -295,6 +356,60 @@ def find_user_by_email(cur, email: str) -> dict | None:
 
 def resolve_session_id(data: dict) -> str:
     return str(data.get("session_id") or data.get("sessionId") or "").strip()
+
+
+def get_cached_stripe_plan(email: str) -> tuple[str, bool]:
+    """
+    Get cached Stripe plan for user.
+    Returns: (plan, cache_hit)
+    """
+    with STRIPE_PLAN_CACHE_LOCK:
+        cache_entry = STRIPE_PLAN_CACHE.get(email)
+        if cache_entry:
+            plan, timestamp = cache_entry
+            if time.time() - timestamp < STRIPE_PLAN_CACHE_TTL:
+                logging.debug("Cache HIT for Stripe plan sync, email=%s, cached_plan=%s", email, plan)
+                return plan, True
+            else:
+                # Expired entry
+                del STRIPE_PLAN_CACHE[email]
+                logging.debug("Cache EXPIRED for Stripe plan sync, email=%s", email)
+    return "none", False
+
+
+def set_cached_stripe_plan(email: str, plan: str) -> None:
+    """
+    Cache Stripe plan for user with current timestamp.
+    """
+    with STRIPE_PLAN_CACHE_LOCK:
+        STRIPE_PLAN_CACHE[email] = (plan, time.time())
+        logging.debug("Cache SET for Stripe plan sync, email=%s, plan=%s", email, plan)
+
+
+def should_sync_stripe_plan(email: str, current_plan: str) -> bool:
+    """
+    Determines if we should perform a Stripe sync for this user.
+    Returns True if:
+    - User has no paid plan (plan == "none") - check if they upgraded
+    - Cache is expired or missing
+    """
+    normalized_plan = normalize_plan(current_plan)
+    
+    # Always check for users with "none" plan (they might have purchased)
+    if normalized_plan == "none":
+        return True
+    
+    # For paid plans, check cache
+    with STRIPE_PLAN_CACHE_LOCK:
+        cache_entry = STRIPE_PLAN_CACHE.get(email)
+        if cache_entry:
+            _, timestamp = cache_entry
+            # If cache is still valid, no need to sync
+            if time.time() - timestamp < STRIPE_PLAN_CACHE_TTL:
+                return False
+    
+    # Cache expired or missing for paid plan
+    return True
 
 
 # ---------------------------- Blueprint für ZEVIX ----------------------------
@@ -364,11 +479,14 @@ def login():
             plan = normalize_plan(user_data.get("plan"))
             valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
 
-            # Bei jedem Login Plan mit Stripe abgleichen, damit stale Status korrigiert wird.
-            reconciled_plan = sync_user_plan_from_stripe(email, plan)
-            if reconciled_plan != plan:
-                plan = reconciled_plan
-                valid_until = default_auth_until_ms()
+            # Only sync with Stripe if necessary (cache miss or no paid plan)
+            if should_sync_stripe_plan(email, plan):
+                reconciled_plan = sync_user_plan_from_stripe(email, plan)
+                if reconciled_plan != plan:
+                    plan = reconciled_plan
+                    valid_until = default_auth_until_ms()
+            else:
+                logging.debug("Skipping Stripe sync (cached), email=%s, plan=%s", email, plan)
 
             cur.execute(
                 """
@@ -463,11 +581,14 @@ def refresh_token():
             plan = normalize_plan(user_data.get("plan"))
             valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
             
-            # Sync plan with Stripe
-            reconciled_plan = sync_user_plan_from_stripe(email, plan)
-            if reconciled_plan != plan:
-                plan = reconciled_plan
-                valid_until = default_auth_until_ms()
+            # Only sync with Stripe if necessary (cache miss or no paid plan)
+            if should_sync_stripe_plan(email, plan):
+                reconciled_plan = sync_user_plan_from_stripe(email, plan)
+                if reconciled_plan != plan:
+                    plan = reconciled_plan
+                    valid_until = default_auth_until_ms()
+            else:
+                logging.debug("Skipping Stripe sync (cached), email=%s, plan=%s", email, plan)
             
             cur.execute(
                 """
