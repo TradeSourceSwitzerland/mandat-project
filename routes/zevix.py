@@ -27,6 +27,15 @@ def normalize_plan(plan: str | None) -> str:
     return value if value in VALID_PLANS else "none"
 
 
+def normalize_email_candidate(value: str | None) -> str:
+    email = str(value or "").strip().lower()
+    if not email or " " in email or email.count("@") != 1:
+        return ""
+    local, domain = email.split("@", 1)
+    if not local or not domain or "." not in domain:
+        return ""
+    return email
+
 def default_auth_until_ms() -> int:
     return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
 
@@ -109,40 +118,38 @@ def configured_price_plan_map() -> dict[str, str]:
 
 
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
-    email = (checkout_session.get("customer_email") or "").strip().lower()
+    email = normalize_email_candidate(checkout_session.get("customer_email"))
     if email:
         return email
-        
+
     customer_details = checkout_session.get("customer_details") or {}
-    email = str(customer_details.get("email") or "").strip().lower()
+    email = normalize_email_candidate(customer_details.get("email"))
     if email:
         return email
 
     metadata = checkout_session.get("metadata") or {}
     for key in ("email", "user_email", "customer_email"):
-        email = str(metadata.get(key) or "").strip().lower()
+        email = normalize_email_candidate(metadata.get(key))
         if email:
             return email
 
     # Fallback: Einige Payment-Links speichern die User-Identität in client_reference_id.
-    client_reference_id = str(checkout_session.get("client_reference_id") or "").strip().lower()
-    if "@" in client_reference_id:
-        return client_reference_id
+    email = normalize_email_candidate(checkout_session.get("client_reference_id"))
+    if email:
+        return email
 
     # Letzter Versuch: E-Mail über Stripe Customer auflösen.
     customer_id = str(checkout_session.get("customer") or "").strip()
     if customer_id:
         try:
             customer = stripe.Customer.retrieve(customer_id)
-            email = str(customer.get("email") or "").strip().lower()
+            email = normalize_email_candidate(customer.get("email"))
             if email:
                 return email
         except Exception as exc:
             logging.warning("Stripe customer lookup fehlgeschlagen, customer_id=%s, error=%s", customer_id, exc)
 
     return ""
-    customer_details = checkout_session.get("customer_details") or {}
-    return str(customer_details.get("email") or "").strip().lower()
 
 
 def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
@@ -220,6 +227,85 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     return "none"
 
 
+def plan_rank(plan: str) -> int:
+    order = {"none": 0, "basic": 1, "business": 2, "enterprise": 3}
+    return order.get(normalize_plan(plan), 0)
+
+
+def resolve_plan_from_subscription(subscription: dict) -> str:
+    status = str(subscription.get("status") or "").strip().lower()
+    if status not in {"active", "trialing", "past_due"}:
+        return "none"
+
+    plan_by_price_id = configured_price_plan_map()
+    items = ((subscription.get("items") or {}).get("data") or [])
+    best_plan = "none"
+
+    for item in items:
+        price = item.get("price") or {}
+        price_id = str(price.get("id") or "").strip()
+        product_id = str(price.get("product") or "").strip()
+        resolved = normalize_plan(plan_by_price_id.get(price_id) or plan_by_price_id.get(product_id))
+        if plan_rank(resolved) > plan_rank(best_plan):
+            best_plan = resolved
+
+    return best_plan
+
+
+def sync_user_plan_from_stripe_if_needed(email: str, current_plan: str) -> str:
+    normalized_current_plan = normalize_plan(current_plan)
+
+    # Nur heilen, wenn lokal kein verwertbarer Plan vorliegt.
+    if normalized_current_plan != "none":
+        return normalized_current_plan
+
+    if not stripe.api_key:
+        return normalized_current_plan
+
+    try:
+        customers = stripe.Customer.list(email=email, limit=5).get("data", [])
+    except Exception as exc:
+        logging.warning("Stripe Customer-Suche fehlgeschlagen, email=%s, error=%s", email, exc)
+        return normalized_current_plan
+
+    best_plan = normalized_current_plan
+    for customer in customers:
+        customer_id = str(customer.get("id") or "").strip()
+        if not customer_id:
+            continue
+
+        try:
+            subscriptions = stripe.Subscription.list(customer=customer_id, status="all", limit=20).get("data", [])
+        except Exception as exc:
+            logging.warning("Stripe Subscriptions konnten nicht geladen werden, customer_id=%s, error=%s", customer_id, exc)
+            continue
+
+        for subscription in subscriptions:
+            resolved = resolve_plan_from_subscription(subscription)
+            if plan_rank(resolved) > plan_rank(best_plan):
+                best_plan = resolved
+
+    if best_plan != normalized_current_plan:
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE users
+                        SET plan=%s, valid_until=%s
+                        WHERE lower(email)=%s
+                        """,
+                        (best_plan, default_auth_until_ms(), email),
+                    )
+                conn.commit()
+        except Exception as exc:
+            logging.warning("Lokales Plan-Healing fehlgeschlagen, email=%s, error=%s", email, exc)
+            return normalized_current_plan
+
+    return best_plan
+
+
+
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
 
@@ -284,6 +370,12 @@ def login():
 
             plan = normalize_plan(user_data.get("plan"))
             valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
+
+            # Falls Checkout-Sync vorher nicht sauber durchlief, beim Login aus Stripe heilen.
+            healed_plan = sync_user_plan_from_stripe_if_needed(email, plan)
+            if healed_plan != plan:
+                plan = healed_plan
+                valid_until = default_auth_until_ms()
 
             cur.execute(
                 """
