@@ -2,6 +2,7 @@ import os
 import logging
 import bcrypt
 import jwt
+import json
 import psycopg
 import stripe
 import time
@@ -32,6 +33,14 @@ STRIPE_PLAN_CACHE_LOCK = Lock()
 ACTIVE_STRIPE_REQUESTS = {}
 ACTIVE_STRIPE_REQUESTS_LOCK = Lock()
 
+# Lead limits by plan
+LEADS_LIMIT_BY_PLAN = {
+    "none": 0,
+    "basic": 500,
+    "business": 1000,
+    "enterprise": 4500,
+}
+
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
     value = str(plan or "none").strip().lower()
@@ -53,6 +62,19 @@ def default_auth_until_ms() -> int:
 
 def get_month_key() -> str:
     return datetime.now().strftime("%Y-%m")
+
+
+def get_leads_limit(plan: str) -> int:
+    """
+    Returns the monthly lead limit for a given plan.
+    
+    Args:
+        plan: The plan name (basic, business, enterprise, none)
+    
+    Returns:
+        Monthly lead limit (0 for none plan)
+    """
+    return LEADS_LIMIT_BY_PLAN.get(normalize_plan(plan), 0)
 
 
 def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
@@ -160,13 +182,14 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
                 new_plan = old_plan
 
             if old_plan != new_plan:
+                month = get_month_key()
                 cur.execute(
                     """
                     UPDATE usage
                     SET plan = %s
-                    WHERE user_email = %s
+                    WHERE user_email = %s AND month = %s
                     """,
-                    (new_plan, email),
+                    (new_plan, email, month),
                 )
                 conn.commit()
 
@@ -625,6 +648,151 @@ def refresh_token():
     session["used_ids"] = used_ids
     
     return response
+
+
+# ---------------------------- EXPORT LEAD ----------------------------
+@zevix_bp.route("/zevix/export-lead", methods=["POST"])
+def export_lead():
+    """
+    Exports a lead and tracks usage against the user's monthly plan limit.
+    
+    This endpoint:
+    - Validates user authentication
+    - Checks if user has enough remaining leads for the month
+    - Prevents duplicate lead exports (same lead_id twice)
+    - Enforces plan-based limits (basic=500, business=1000, enterprise=4500)
+    - Updates usage counters and tracks used lead IDs
+    """
+    # Check if user is logged in
+    user_email = session.get("email")
+    if not user_email:
+        return jsonify({"success": False, "error": "not_authenticated"}), 401
+    
+    data = request_payload()
+    lead_data = data.get("lead_data")
+    if not lead_data:
+        return jsonify({"success": False, "error": "missing_lead_data"}), 400
+    
+    # Extract lead_id from lead_data (could be a dict with id or just a string ID)
+    if isinstance(lead_data, dict):
+        lead_id = lead_data.get("id") or lead_data.get("lead_id")
+    else:
+        lead_id = str(lead_data)
+    
+    if not lead_id:
+        return jsonify({"success": False, "error": "missing_lead_id"}), 400
+    
+    month = get_month_key()
+    
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Get user's current plan
+            cur.execute(
+                """
+                SELECT plan
+                FROM users
+                WHERE lower(email)=%s
+                """,
+                (user_email.lower(),),
+            )
+            user_data = cur.fetchone()
+            
+            if not user_data:
+                return jsonify({"success": False, "error": "user_not_found"}), 404
+            
+            plan = normalize_plan(user_data.get("plan"))
+            limit = get_leads_limit(plan)
+            
+            # If user has no plan or limit is 0, deny export
+            if limit == 0:
+                return jsonify({
+                    "success": False,
+                    "error": "no_plan",
+                    "message": "You need an active plan to export leads"
+                }), 403
+            
+            # Ensure usage record exists for this month
+            cur.execute(
+                """
+                INSERT INTO usage (user_email, month, used, used_ids, plan)
+                VALUES (%s, %s, 0, '[]'::jsonb, %s)
+                ON CONFLICT (user_email, month) DO NOTHING
+                """,
+                (user_email, month, plan),
+            )
+            
+            # Get current usage
+            cur.execute(
+                """
+                SELECT used, used_ids
+                FROM usage
+                WHERE user_email=%s AND month=%s
+                """,
+                (user_email, month),
+            )
+            usage = cur.fetchone() or {}
+            used = int(usage.get("used", 0))
+            used_ids_raw = usage.get("used_ids")
+            
+            # Ensure used_ids is a list (handle both JSONB and string cases)
+            if isinstance(used_ids_raw, str):
+                used_ids = json.loads(used_ids_raw) if used_ids_raw else []
+            elif isinstance(used_ids_raw, list):
+                used_ids = used_ids_raw
+            else:
+                used_ids = []
+            
+            # Check for duplicate lead_id
+            if lead_id in used_ids:
+                return jsonify({
+                    "success": False,
+                    "error": "lead_already_used",
+                    "message": "This lead has already been exported",
+                    "used": used,
+                    "remaining": limit - used,
+                    "limit": limit
+                }), 409
+            
+            # Check if user has reached their monthly limit
+            if used >= limit:
+                return jsonify({
+                    "success": False,
+                    "error": "monthly_limit_exceeded",
+                    "message": f"You have 0 leads remaining ({used}/{limit})",
+                    "used": used,
+                    "remaining": 0,
+                    "limit": limit
+                }), 403
+            
+            # Increment usage and add lead_id to used_ids
+            new_used = used + 1
+            new_used_ids = used_ids + [lead_id]
+            
+            cur.execute(
+                """
+                UPDATE usage
+                SET used = %s, used_ids = %s::jsonb
+                WHERE user_email = %s AND month = %s
+                """,
+                (new_used, json.dumps(new_used_ids), user_email, month),
+            )
+            conn.commit()
+            
+            # Update session with new values
+            session["used"] = new_used
+            session["used_ids"] = new_used_ids
+            
+            remaining = limit - new_used
+            
+            return jsonify({
+                "success": True,
+                "used": new_used,
+                "remaining": remaining,
+                "limit": limit,
+                "lead_id": lead_id,
+                "month": month,
+                "message": f"Lead exported successfully. {remaining} leads remaining"
+            })
 
 
 # ---------------------------- CREATE CHECKOUT SESSION ----------------------------
