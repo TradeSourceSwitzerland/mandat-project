@@ -374,28 +374,3 @@ def verify_session():
     logging.info("verify-session erfolgreich, session_id=%s", session_id)
 
     return jsonify(success=True)
-
-
-# ---------------------------- STRIPE WEBHOOK ----------------------------
-@zevix_bp.route("/webhook", methods=["POST"])
-def stripe_webhook():
-    payload = request.get_data(as_text=True)
-    sig_header = request.headers.get("Stripe-Signature")
-
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, os.getenv("STRIPE_ENDPOINT_SECRET"))
-    except ValueError:
-        return jsonify(success=False, error="invalid_payload"), 400
-    except stripe.error.SignatureVerificationError:
-        return jsonify(success=False, error="invalid_signature"), 400
-
-    if event.get("type") != "checkout.session.completed":
-        return jsonify(success=True)
-
-    checkout_session = event.get("data", {}).get("object", {})
-    updated, message = apply_checkout_result_to_user(checkout_session)
-    if not updated:
-        status_code = 404 if message == "user_not_found" else 400
-        return jsonify(success=False, error=message), status_code
-
-    return jsonify(success=True)
