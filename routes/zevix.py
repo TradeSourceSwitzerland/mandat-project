@@ -92,27 +92,30 @@ def configured_price_plan_map() -> dict[str, str]:
 
 
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
+    # PRIORITY 1: Check metadata for app email (most reliable for our use case)
+    metadata = checkout_session.get("metadata") or {}
+    for key in ("app_email", "user_email", "email"):
+        email = normalize_email_candidate(metadata.get(key))
+        if email:
+            return email
+
+    # PRIORITY 2: Check client_reference_id (often used for user identification)
+    email = normalize_email_candidate(checkout_session.get("client_reference_id"))
+    if email:
+        return email
+
+    # PRIORITY 3: Check customer_email (might be different from app email)
     email = normalize_email_candidate(checkout_session.get("customer_email"))
     if email:
         return email
 
+    # PRIORITY 4: Check customer_details
     customer_details = checkout_session.get("customer_details") or {}
     email = normalize_email_candidate(customer_details.get("email"))
     if email:
         return email
 
-    metadata = checkout_session.get("metadata") or {}
-    for key in ("email", "user_email", "customer_email"):
-        email = normalize_email_candidate(metadata.get(key))
-        if email:
-            return email
-
-    # Fallback: Einige Payment-Links speichern die User-Identität in client_reference_id.
-    email = normalize_email_candidate(checkout_session.get("client_reference_id"))
-    if email:
-        return email
-
-    # Letzter Versuch: E-Mail über Stripe Customer auflösen.
+    # PRIORITY 5: Last resort - lookup via Stripe Customer
     customer_id = str(checkout_session.get("customer") or "").strip()
     if customer_id:
         try:
@@ -501,6 +504,70 @@ def refresh_token():
     session["used_ids"] = used_ids
     
     return response
+
+
+# ---------------------------- CREATE CHECKOUT SESSION ----------------------------
+@zevix_bp.route("/zevix/create-checkout-session", methods=["POST"])
+def create_checkout_session():
+    """
+    Creates a Stripe checkout session for the logged-in user.
+    Automatically uses the user's app email from session for proper synchronization.
+    """
+    # Check if user is logged in
+    user_email = session.get("email")
+    if not user_email:
+        return jsonify({"success": False, "message": "not_authenticated"}), 401
+    
+    data = request_payload()
+    price_id = data.get("price_id")
+    success_url = data.get("success_url")
+    cancel_url = data.get("cancel_url")
+    
+    if not price_id:
+        return jsonify({"success": False, "message": "missing_price_id"}), 400
+    
+    if not success_url:
+        return jsonify({"success": False, "message": "missing_success_url"}), 400
+    
+    if not cancel_url:
+        cancel_url = success_url  # Use success_url as fallback
+    
+    try:
+        # Create Stripe checkout session with user's app email
+        checkout_session = stripe.checkout.Session.create(
+            customer_email=user_email,  # Use app email for Stripe checkout
+            client_reference_id=user_email,  # Additional backup for email
+            metadata={
+                "app_email": user_email,  # Highest priority in resolve function
+                "user_email": user_email,  # Backup metadata field
+            },
+            line_items=[
+                {
+                    "price": price_id,
+                    "quantity": 1,
+                }
+            ],
+            mode="subscription",
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        
+        logging.info(
+            "Checkout session created successfully, session_id=%s, user_email=%s, price_id=%s",
+            checkout_session.get("id"),
+            user_email,
+            price_id,
+        )
+        
+        return jsonify({
+            "success": True,
+            "session_id": checkout_session.get("id"),
+            "url": checkout_session.get("url"),
+        })
+        
+    except Exception as exc:
+        logging.error("Failed to create checkout session, user_email=%s, error=%s", user_email, exc)
+        return jsonify({"success": False, "message": "checkout_creation_failed"}), 500
 
 
 # ---------------------------- VERIFY SESSION ----------------------------
