@@ -42,12 +42,15 @@ LEAD_LIMITS = {
 }
 
 # ---------------------------- HELPERS ----------------------------
-def calculate_remaining_leads(plan_limit: float, used: int) -> int | float | str:
-    """Calculate remaining leads for display purposes."""
+def calculate_remaining_leads(plan_limit: float, used: int) -> int | str:
+    """
+    Calculate remaining leads for display purposes.
+    Returns: int (remaining count) or "unlimited" for enterprise plans
+    """
     if plan_limit == float('inf'):
         return "unlimited"
-    remaining = plan_limit - used
-    return remaining if remaining != float('inf') else "unlimited"
+    remaining = int(plan_limit - used)
+    return remaining
 
 
 def normalize_plan(plan: str | None) -> str:
@@ -917,10 +920,11 @@ def export_lead():
                 
                 # Check if user has reached limit
                 if used >= plan_limit:
+                    limit_display = "unlimited" if plan_limit == float('inf') else int(plan_limit)
                     return jsonify({
                         "success": False,
                         "error": "monthly_limit_exceeded",
-                        "message": f"You have 0 leads remaining. Your {plan} plan allows {plan_limit} leads per month."
+                        "message": f"You have 0 leads remaining. Your {plan} plan allows {limit_display} leads per month."
                     }), 403
                 
                 # Increment usage and add lead_id to used_ids
