@@ -41,14 +41,17 @@ LEAD_LIMITS = {
     "enterprise": float('inf'),  # unlimited
 }
 
+# Display constant for unlimited plans
+UNLIMITED_DISPLAY = "unlimited"
+
 # ---------------------------- HELPERS ----------------------------
 def calculate_remaining_leads(plan_limit: float, used: int) -> int | str:
     """
     Calculate remaining leads for display purposes.
-    Returns: int (remaining count) or "unlimited" for enterprise plans
+    Returns: int (remaining count) or UNLIMITED_DISPLAY for enterprise plans
     """
     if plan_limit == float('inf'):
-        return "unlimited"
+        return UNLIMITED_DISPLAY
     remaining = int(plan_limit - used)
     return remaining
 
@@ -905,7 +908,9 @@ def export_lead():
                     return jsonify({"success": False, "error": "internal_error", "message": "Failed to retrieve usage data"}), 500
                 
                 used = int(usage_data.get("used") or 0)
-                used_ids = usage_data.get("used_ids") or []
+                used_ids = usage_data.get("used_ids")
+                if used_ids is None:
+                    used_ids = []
                 
                 # Check if lead was already exported (idempotent operation)
                 if lead_id in used_ids:
@@ -918,9 +923,9 @@ def export_lead():
                         "message": "Lead already exported this month"
                     })
                 
-                # Check if user has reached limit
+                # Check if user has reached limit (enterprise plans have unlimited, so this won't trigger)
                 if used >= plan_limit:
-                    limit_display = "unlimited" if plan_limit == float('inf') else int(plan_limit)
+                    limit_display = UNLIMITED_DISPLAY if plan_limit == float('inf') else int(plan_limit)
                     return jsonify({
                         "success": False,
                         "error": "monthly_limit_exceeded",
