@@ -61,7 +61,10 @@ def request_payload() -> dict:
         return data
     if request.form:
         return request.form.to_dict(flat=True)
-@@ -87,55 +96,82 @@ def verify_password(password: str, stored_password: str | None) -> bool:
+
+
+def verify_password(password: str, stored_password: str | None) -> bool:
+    return compare_digest(bcrypt.hashpw(password.encode(), stored_password.encode()) if stored_password else b"", stored_password.encode())
 
 
 def get_conn():
@@ -144,7 +147,17 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
                 cur.execute(
                     """
                     UPDATE usage
-@@ -169,50 +205,151 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
+                    SET plan = %s
+                    WHERE user_email = %s
+                    """,
+                    (new_plan, email),
+                )
+                conn.commit()
+
+    return True, ""
+
+
+def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     line_items = (checkout_session.get("line_items") or {}).get("data")
     if not line_items:
         session_id = checkout_session.get("id")
@@ -162,7 +175,7 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
         price_id = price.get("id")
         product_id = price.get("product")
         resolved = normalize_plan(
-            plan_by_price_id.get(price_id) or plan_by_price_id.get(product_id)
+            DEFAULT_PLAN_BY_PRICE_ID.get(price_id) or DEFAULT_PLAN_BY_PRICE_ID.get(product_id)
         )
         if resolved != "none":
             return resolved
@@ -270,7 +283,6 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
     return reconciled_plan
 
 
-
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
 
@@ -296,7 +308,23 @@ def register():
                     """,
                     (email, hashed, "none", default_auth_until_ms()),
                 )
-@@ -234,50 +371,56 @@ def login():
+                conn.commit()
+    except Exception as exc:
+        logging.error("Fehler beim Hinzufügen des Benutzers: %s", exc)
+        return jsonify({"success": False, "message": "internal_error"}), 500
+
+    return jsonify({"success": True, "message": "registered"})
+
+
+# ---------------------------- LOGIN ----------------------------
+@zevix_bp.route("/zevix/login", methods=["POST"])
+def login():
+    data = request_payload()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"success": False, "message": "missing"}), 400
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -353,7 +381,7 @@ def register():
     token = create_jwt_token(email, plan, valid_until)
 
     response = jsonify(
-            {
+        {
             "success": True,
             "email": email,
             "plan": plan,
@@ -399,8 +427,7 @@ def verify_session():
         payment_status,
         session_status,
     )
-    # Trial-, offene oder kostenfreie Checkout-Sessions sollen nicht in einem Reload-Loop enden.
-    # In diesen Fällen darf das Frontend den User direkt ins Dashboard leiten.
+
     free_or_trial_statuses = {"pending", "unpaid", "no_payment_required"}
     if payment_status in free_or_trial_statuses or session_status == "open":
         logging.info(
@@ -409,7 +436,6 @@ def verify_session():
             payment_status,
             session_status,
         )
-        # Für kostenfreie bzw. Trial-Checkouts trotzdem versuchen, den Plan sofort zu synchronisieren.
         updated, message = apply_checkout_result_to_user(checkout_session)
         if not updated:
             logging.warning(
@@ -417,7 +443,6 @@ def verify_session():
                 session_id,
                 message,
             )
-        # Bestehende Frontend-Kompatibilität: Antwort als Erfolg signalisieren.
         return jsonify(success=True, message="in_trial_or_free")
 
     if payment_status != "paid" and session_status != "complete":
@@ -428,8 +453,7 @@ def verify_session():
             session_status,
         )
         return jsonify(success=False, message="payment_not_completed"), 409
-    # Session ist abgeschlossen (oder bezahlt): Plan-Update versuchen,
-    # aber bei bekannten Race-Conditions nicht in einen Reload-Loop zwingen.
+
     updated, message = apply_checkout_result_to_user(checkout_session)
     if not updated:
         logging.warning("User-Update fehlgeschlagen, session_id=%s, message=%s", session_id, message)
