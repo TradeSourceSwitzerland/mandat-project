@@ -20,7 +20,7 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
         "prod_TxPABMR85vBl2U": "business",
         "prod_TxPAEQ2MB1FblT": "basic",
     }
-    
+
     line_items = (checkout_session.get("line_items") or {}).get("data")
     for item in line_items:
         price = item.get("price") or {}
@@ -47,24 +47,10 @@ zevix_bp = Blueprint("zevix", __name__)
 # ---------------------------- GET Abo-Status ----------------------------
 @zevix_bp.route("/api/get_subscription_status", methods=["GET"])
 def get_subscription_status():
-    # session_id aus der URL holen
-    session_id = request.args.get("session_id")
-    if not session_id:
-        return jsonify({"success": False, "message": "missing_session_id"}), 400
-
-    try:
-        # Stripe-Session anhand der session_id abrufen
-        checkout_session = stripe.checkout.Session.retrieve(session_id, expand=["line_items.data.price"])
-    except Exception as exc:
-        return jsonify({"success": False, "message": "invalid_session"}), 400
-
-    # Plan aus der Stripe-Session extrahieren
-    plan = resolve_plan_from_checkout_session(checkout_session)
-
-    # Benutzer-E-Mail aus der Stripe-Session extrahieren
-    email = resolve_email_from_checkout_session(checkout_session)
+    # Benutzer-E-Mail aus der URL holen (z.B. über query-Parameter)
+    email = request.args.get("email")
     if not email:
-        return jsonify({"success": False, "message": "missing_customer_email"}), 400
+        return jsonify({"success": False, "message": "missing_email"}), 400
 
     # Benutzerinformationen aus der Datenbank abrufen
     with get_conn() as conn:
