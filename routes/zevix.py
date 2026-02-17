@@ -36,6 +36,55 @@ def normalize_email_candidate(value: str | None) -> str:
         return ""
     return email
 
+def default_auth_until_ms() -> int:
+    return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
+
+
+def get_month_key() -> str:
+    return datetime.now().strftime("%Y-%m")
+
+
+def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
+    expiration = datetime.utcnow() + timedelta(days=30)
+    payload = {
+        "email": email,
+        "plan": normalize_plan(plan),
+        "valid_until": valid_until,
+        "exp": expiration,
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+
+def request_payload() -> dict:
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        return data
+    if request.form:
+        return request.form.to_dict(flat=True)
+@@ -87,55 +96,82 @@ def verify_password(password: str, stored_password: str | None) -> bool:
+
+
+def get_conn():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL fehlt")
+    return psycopg.connect(f"{DATABASE_URL}?sslmode=require", row_factory=dict_row)
+
+
+def configured_price_plan_map() -> dict[str, str]:
+    mapping = dict(DEFAULT_PLAN_BY_PRICE_ID)
+    env_map = {
+        os.getenv("STRIPE_PRICE_BASIC"): "basic",
+        os.getenv("STRIPE_PRICE_BUSINESS"): "business",
+        os.getenv("STRIPE_PRICE_ENTERPRISE"): "enterprise",
+        os.getenv("STRIPE_PRODUCT_BASIC"): "basic",
+        os.getenv("STRIPE_PRODUCT_BUSINESS"): "business",
+        os.getenv("STRIPE_PRODUCT_ENTERPRISE"): "enterprise",
+    }
+    for price_id, plan in env_map.items():
+        if price_id:
+            mapping[price_id] = plan
+    return mapping
+
 
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     email = normalize_email_candidate(checkout_session.get("customer_email"))
@@ -72,15 +121,78 @@ def resolve_email_from_checkout_session(checkout_session: dict) -> str:
     return ""
 
 
+def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
+    email = resolve_email_from_checkout_session(checkout_session)
+    if not email:
+        return False, "missing_customer_email"
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan FROM users WHERE lower(email)=%s", (email,))
+            user_row = cur.fetchone()
+            if not user_row:
+                return False, "user_not_found"
+
+            old_plan = normalize_plan(user_row.get("plan"))
+            new_plan = resolve_plan_from_checkout_session(checkout_session)
+
+            # Niemals auf none downgraden, wenn keine belastbare Plan-Info vorliegt
+            if new_plan == "none":
+                new_plan = old_plan
+
+            if old_plan != new_plan:
+                cur.execute(
+                    """
+                    UPDATE usage
+@@ -169,50 +205,151 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
+    line_items = (checkout_session.get("line_items") or {}).get("data")
+    if not line_items:
+        session_id = checkout_session.get("id")
+        if not session_id:
+            return "none"
+
+        try:
+            line_items = stripe.checkout.Session.list_line_items(session_id, limit=10).get("data", [])
+        except Exception as exc:
+            logging.warning("Stripe line items konnten nicht geladen werden: %s", exc)
+            return "none"
+
+    for item in line_items:
+        price = item.get("price") or {}
+        price_id = price.get("id")
+        product_id = price.get("product")
+        resolved = normalize_plan(
+            plan_by_price_id.get(price_id) or plan_by_price_id.get(product_id)
+        )
+        if resolved != "none":
+            return resolved
+
+    return "none"
+
+
 def plan_rank(plan: str) -> int:
     order = {"none": 0, "basic": 1, "business": 2, "enterprise": 3}
     return order.get(normalize_plan(plan), 0)
 
 
-def resolve_plan_from_subscription(subscription: dict) -> str:
+def subscription_status_rank(status: str | None) -> int:
+    order = {
+        "active": 4,
+        "trialing": 3,
+        "past_due": 2,
+        "unpaid": 1,
+        "incomplete": 0,
+        "incomplete_expired": -1,
+        "canceled": -2,
+    }
+    return order.get(str(status or "").strip().lower(), -3)
+
+
+def resolve_plan_from_subscription(subscription: dict) -> tuple[str, tuple[int, int, int, int]] | None:
     status = str(subscription.get("status") or "").strip().lower()
-    if status not in {"active", "trialing", "past_due"}:
-        return "none"
+    status_rank = subscription_status_rank(status)
+    if status_rank < 0:
+        return None
 
     plan_by_price_id = configured_price_plan_map()
     items = ((subscription.get("items") or {}).get("data") or [])
@@ -94,13 +206,17 @@ def resolve_plan_from_subscription(subscription: dict) -> str:
         if plan_rank(resolved) > plan_rank(best_plan):
             best_plan = resolved
 
-    return best_plan
+    period_end = int(subscription.get("current_period_end") or 0)
+    created = int(subscription.get("created") or 0)
+    score = (status_rank, period_end, created, plan_rank(best_plan))
+    return best_plan, score
 
 
 def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
     normalized_current_plan = normalize_plan(current_plan)
 
     if not stripe.api_key:
+        logging.warning("STRIPE_SECRET_KEY fehlt: Stripe-Reconciliation deaktiviert, email=%s", email)
         return normalized_current_plan
 
     try:
@@ -109,7 +225,8 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
         logging.warning("Stripe Customer-Suche fehlgeschlagen, email=%s, error=%s", email, exc)
         return normalized_current_plan
 
-    best_plan = normalized_current_plan
+    best_candidate: tuple[str, tuple[int, int, int, int]] | None = None
+
     for customer in customers:
         customer_id = str(customer.get("id") or "").strip()
         if not customer_id:
@@ -122,11 +239,18 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
             continue
 
         for subscription in subscriptions:
-            resolved = resolve_plan_from_subscription(subscription)
-            if plan_rank(resolved) > plan_rank(best_plan):
-                best_plan = resolved
+            candidate = resolve_plan_from_subscription(subscription)
+            if not candidate:
+                continue
+            if best_candidate is None or candidate[1] > best_candidate[1]:
+                best_candidate = candidate
 
-    if best_plan != normalized_current_plan:
+    if best_candidate is None:
+        return normalized_current_plan
+
+    reconciled_plan = normalize_plan(best_candidate[0])
+
+    if reconciled_plan != normalized_current_plan:
         try:
             with get_conn() as conn:
                 with conn.cursor() as cur:
@@ -136,14 +260,16 @@ def sync_user_plan_from_stripe(email: str, current_plan: str) -> str:
                         SET plan=%s, valid_until=%s
                         WHERE lower(email)=%s
                         """,
-                        (best_plan, default_auth_until_ms(), email),
+                        (reconciled_plan, default_auth_until_ms(), email),
                     )
                 conn.commit()
         except Exception as exc:
-            logging.warning("Lokales Plan-Healing fehlgeschlagen, email=%s, error=%s", email, exc)
+            logging.warning("Lokales Plan-Reconciliation fehlgeschlagen, email=%s, error=%s", email, exc)
             return normalized_current_plan
 
-    return best_plan
+    return reconciled_plan
+
+
 
 # ---------------------------- Blueprint für ZEVIX ----------------------------
 zevix_bp = Blueprint("zevix", __name__)
@@ -170,21 +296,7 @@ def register():
                     """,
                     (email, hashed, "none", default_auth_until_ms()),
                 )
-            conn.commit()
-        return jsonify({"success": True})
-    except psycopg.errors.UniqueViolation:
-        return jsonify({"success": False, "message": "exists"}), 400
-
-
-# ---------------------------- LOGIN ----------------------------
-@zevix_bp.route("/zevix/login", methods=["POST"])
-def login():
-    data = request_payload()
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"success": False, "message": "missing"}), 400
+@@ -234,50 +371,56 @@ def login():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -216,7 +328,6 @@ def login():
                 plan = reconciled_plan
                 valid_until = default_auth_until_ms()
 
-
             cur.execute(
                 """
                 INSERT INTO usage (user_email, month, used, used_ids)
@@ -242,7 +353,7 @@ def login():
     token = create_jwt_token(email, plan, valid_until)
 
     response = jsonify(
-        {
+            {
             "success": True,
             "email": email,
             "plan": plan,
@@ -328,7 +439,7 @@ def verify_session():
                 session_id,
             )
             return jsonify(success=True, message="sync_pending")
-            
+
         status_code = 404 if message == "user_not_found" else 400
         return jsonify(success=False, message=message), status_code
 
