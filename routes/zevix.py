@@ -671,7 +671,7 @@ def export_lead():
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_email = payload.get("email")
-        except:
+        except Exception:
             pass
 
     # Fallback to session (for backward compatibility)
