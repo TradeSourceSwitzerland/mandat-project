@@ -663,8 +663,21 @@ def export_lead():
     - Enforces plan-based limits (basic=500, business=1000, enterprise=4500)
     - Updates usage counters and tracks used lead IDs
     """
-    # Check if user is logged in
-    user_email = session.get("email")
+    # Try to get user_email from Bearer token first (for Webflow embed)
+    user_email = None
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_email = payload.get("email")
+        except:
+            pass
+
+    # Fallback to session (for backward compatibility)
+    if not user_email:
+        user_email = session.get("email")
+
     if not user_email:
         return jsonify({"success": False, "error": "not_authenticated"}), 401
     
