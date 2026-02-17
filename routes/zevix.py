@@ -732,7 +732,15 @@ def export_lead():
             )
             usage = cur.fetchone() or {}
             used = int(usage.get("used") or 0)
-            used_ids = usage.get("used_ids") or []
+            used_ids_raw = usage.get("used_ids")
+            
+            # Ensure used_ids is a list (handle both JSONB and string cases)
+            if isinstance(used_ids_raw, str):
+                used_ids = json.loads(used_ids_raw) if used_ids_raw else []
+            elif isinstance(used_ids_raw, list):
+                used_ids = used_ids_raw
+            else:
+                used_ids = []
             
             # Check for duplicate lead_id
             if lead_id in used_ids:
