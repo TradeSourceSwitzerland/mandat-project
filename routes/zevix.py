@@ -32,6 +32,7 @@ def resolve_plan_from_checkout_session(checkout_session: dict) -> str:
     return "none"
 
 def resolve_email_from_checkout_session(checkout_session: dict) -> str:
+    # Hier holen wir die E-Mail des Kunden aus der Stripe-Sitzung
     email = (checkout_session.get("customer_email") or "").strip().lower()
     if email:
         return email
@@ -47,33 +48,55 @@ zevix_bp = Blueprint("zevix", __name__)
 # ---------------------------- GET Abo-Status ----------------------------
 @zevix_bp.route("/api/get_subscription_status", methods=["GET"])
 def get_subscription_status():
-    # Benutzer-E-Mail aus der URL holen (z.B. über query-Parameter)
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"success": False, "message": "missing_email"}), 400
+    # session_id aus der URL holen
+    session_id = request.args.get("session_id")
+    if not session_id:
+        return jsonify({"success": False, "message": "missing_session_id"}), 400
 
-    # Benutzerinformationen aus der Datenbank abrufen
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT plan, valid_until
-                FROM users
-                WHERE lower(email)=%s
-                """,
-                (email.lower(),),
-            )
-            user_data = cur.fetchone()
-            if not user_data:
-                return jsonify({"success": False, "message": "user_not_found"}), 404
+    try:
+        # Versuchen, die Stripe-Session mit dem session_id abzurufen
+        checkout_session = stripe.checkout.Session.retrieve(session_id, expand=["line_items.data.price"])
 
-            # Benutzerplan und Ablaufdatum
-            user_plan = user_data.get("plan", "none")
-            user_valid_until = int(user_data.get("valid_until", default_auth_until_ms()))
+        # Überprüfe, ob die Session-Daten erfolgreich abgerufen wurden
+        if not checkout_session:
+            return jsonify({"success": False, "message": "Stripe session not found"}), 404
 
-    return jsonify({
-        "success": True,
-        "plan": user_plan,
-        "valid_until": user_valid_until,
-        "auth_until": user_valid_until,  # Optional für Frontend-Kompatibilität
-    })
+        # Den Plan aus der Stripe-Sitzung extrahieren
+        plan = resolve_plan_from_checkout_session(checkout_session)
+
+        # Benutzer-E-Mail aus der Stripe-Sitzung extrahieren
+        email = resolve_email_from_checkout_session(checkout_session)
+
+        # Benutzerdaten aus der Datenbank abrufen
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT plan, valid_until
+                    FROM users
+                    WHERE lower(email)=%s
+                    """,
+                    (email.lower(),),
+                )
+                user_data = cur.fetchone()
+                if not user_data:
+                    return jsonify({"success": False, "message": "user_not_found"}), 404
+
+                # Benutzerplan und Ablaufdatum aus der Datenbank abfragen
+                user_plan = user_data.get("plan", "none")
+                user_valid_until = int(user_data.get("valid_until", default_auth_until_ms()))
+
+        # Antwort mit den abgerufenen Abo-Daten
+        return jsonify({
+            "success": True,
+            "plan": user_plan,
+            "valid_until": user_valid_until,
+            "auth_until": user_valid_until,  # Optional für Frontend-Kompatibilität
+        })
+    
+    except stripe.error.StripeError as e:
+        # Fehlerbehandlung für Stripe-API-Fehler
+        return jsonify({"success": False, "message": f"Stripe error: {str(e)}"}), 500
+    except Exception as e:
+        # Allgemeine Fehlerbehandlung
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
