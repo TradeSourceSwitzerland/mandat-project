@@ -182,6 +182,31 @@
                     body: JSON.stringify({ lead_ids: leadIds })
                 });
                 
+                // ✅ FIX 7: Check HTTP status before parsing JSON
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorData.error || errorMessage;
+                    } catch (e) {
+                        // If JSON parsing fails, use status text
+                        errorMessage = response.statusText || errorMessage;
+                    }
+                    
+                    // Provide specific error messages based on status code
+                    if (response.status === 401) {
+                        alert("🔐 Sitzung abgelaufen. Bitte melde dich erneut an.");
+                        window.location.href = "/login";
+                    } else if (response.status === 403) {
+                        alert(`🚫 Zugriff verweigert: ${errorMessage}`);
+                    } else if (response.status === 500) {
+                        alert(`⚠️ Server-Fehler: ${errorMessage}\n\nBitte versuche es später erneut.`);
+                    } else {
+                        alert(`❌ Fehler beim Lead-Export: ${errorMessage}`);
+                    }
+                    return false;
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -210,7 +235,19 @@
                 }
             } catch (error) {
                 console.error("Export error:", error);
-                alert("❌ Fehler beim Export: " + error.message);
+                // ✅ FIX 8: Show detailed error message with better context
+                const errorDetails = error.message || error.toString() || 'Unknown error';
+                // Check for network-related errors more robustly
+                const errorStr = typeof errorDetails === 'string' ? errorDetails.toLowerCase() : '';
+                const isNetworkError = error instanceof TypeError || 
+                                     errorStr.includes('network') ||
+                                     errorStr.includes('failed to fetch');
+                
+                if (isNetworkError) {
+                    alert("🌐 Netzwerkfehler: Bitte überprüfe deine Internetverbindung und versuche es erneut.");
+                } else {
+                    alert(`❌ Fehler beim Export: ${errorDetails}`);
+                }
                 return false;
             }
         }
