@@ -27,7 +27,7 @@
             const token = localStorage.getItem("auth_token");
             
             if (!token) {
-                alert("🔐 Du musst eingeloggt sein");
+                // Silent redirect - no alert needed
                 window.location.href = "/login";
                 return;
             }
@@ -74,12 +74,12 @@
                     document.getElementById("leadsLimit").textContent = limit;
                     document.getElementById("leadsRemaining").textContent = remaining;
                 } else {
-                    alert("❌ Fehler beim Laden der Dashboard-Daten");
+                    // Silent redirect - authentication or server error
                     window.location.href = "/login";
                 }
             } catch (error) {
                 console.error("Dashboard load error:", error);
-                alert("❌ Fehler beim Laden des Dashboards");
+                // Silent redirect on error
                 window.location.href = "/login";
             }
         }
