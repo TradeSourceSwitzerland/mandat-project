@@ -184,13 +184,13 @@
                 
                 // ✅ FIX 7: Check HTTP status before parsing JSON
                 if (!response.ok) {
-                    let errorMsg = `HTTP ${response.status}`;
+                    let errorMessage = `HTTP ${response.status}`;
                     try {
                         const errorData = await response.json();
-                        errorMsg = errorData.message || errorData.error || errorMsg;
+                        errorMessage = errorData.message || errorData.error || errorMessage;
                     } catch (e) {
                         // If JSON parsing fails, use status text
-                        errorMsg = response.statusText || errorMsg;
+                        errorMessage = response.statusText || errorMessage;
                     }
                     
                     // Provide specific error messages based on status code
@@ -198,11 +198,11 @@
                         alert("🔐 Sitzung abgelaufen. Bitte melde dich erneut an.");
                         window.location.href = "/login";
                     } else if (response.status === 403) {
-                        alert(`🚫 Zugriff verweigert: ${errorMsg}`);
+                        alert(`🚫 Zugriff verweigert: ${errorMessage}`);
                     } else if (response.status === 500) {
-                        alert(`⚠️ Server-Fehler: ${errorMsg}\n\nBitte versuche es später erneut.`);
+                        alert(`⚠️ Server-Fehler: ${errorMessage}\n\nBitte versuche es später erneut.`);
                     } else {
-                        alert(`❌ Fehler beim Lead-Export: ${errorMsg}`);
+                        alert(`❌ Fehler beim Lead-Export: ${errorMessage}`);
                     }
                     return false;
                 }
