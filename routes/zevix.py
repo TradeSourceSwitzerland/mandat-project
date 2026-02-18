@@ -925,9 +925,12 @@ def export_leads_batch():
             else:
                 used_ids = []
             
+            # Convert to set for O(n) performance instead of O(n²)
+            used_ids_set = set(used_ids)
+            
             # Filter out duplicates - only keep lead IDs that haven't been used yet
-            new_ids = [lid for lid in lead_ids if lid not in used_ids]
-            duplicate_ids = [lid for lid in lead_ids if lid in used_ids]
+            new_ids = [lid for lid in lead_ids if lid not in used_ids_set]
+            duplicate_ids = [lid for lid in lead_ids if lid in used_ids_set]
             
             # Calculate how many new leads we can actually export
             remaining_before = limit - used

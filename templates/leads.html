@@ -192,15 +192,17 @@
                     
                     updateUsageDisplay();
                     
-                    let message = data.message;
+                    // Build message with multiple parts
+                    const messageParts = [data.message];
+                    
                     if (data.duplicate_ids && data.duplicate_ids.length > 0) {
-                        message += `\n⚠️ ${data.duplicate_ids.length} Lead(s) bereits exportiert (übersprungen)`;
+                        messageParts.push(`⚠️ ${data.duplicate_ids.length} Lead(s) bereits exportiert (übersprungen)`);
                     }
                     if (data.not_exported && data.not_exported.length > 0) {
-                        message += `\n⚠️ ${data.not_exported.length} Lead(s) nicht exportiert (Limit erreicht)`;
+                        messageParts.push(`⚠️ ${data.not_exported.length} Lead(s) nicht exportiert (Limit erreicht)`);
                     }
                     
-                    alert(message);
+                    alert(messageParts.join('\n'));
                     return true;
                 } else {
                     alert("❌ Export fehlgeschlagen: " + (data.message || data.error));
@@ -260,16 +262,7 @@
             const success = await consumeLeadsViaAPI(leadIds);
             
             if (success) {
-                // Generate simple PDF (this is a placeholder - in production, use a proper PDF library)
-                alert("📄 PDF-Export würde hier stattfinden (nicht implementiert in diesem Demo)");
-                
-                // In a real implementation, you would use a library like jsPDF:
-                // const doc = new jsPDF();
-                // leadIds.forEach((leadId, index) => {
-                //     const leadItem = document.querySelector(`[data-lead-id="${leadId}"]`);
-                //     doc.text(leadItem.textContent, 10, 10 + (index * 10));
-                // });
-                // doc.save(`leads-${Date.now()}.pdf`);
+                alert("✅ PDF-Export erfolgreich verbucht!\n\n⚠️ Hinweis: Die PDF-Generierung ist derzeit im Frontend noch nicht implementiert. Die Leads wurden aber korrekt von deinem Kontingent abgezogen.\n\nBitte verwende vorerst den CSV-Export.");
             }
         });
         
