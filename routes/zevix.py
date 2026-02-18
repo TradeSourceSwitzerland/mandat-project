@@ -734,11 +734,11 @@ def export_lead():
             # Ensure usage record exists for this month
             cur.execute(
                 """
-                INSERT INTO usage (user_email, month, used, used_ids, plan)
-                VALUES (%s, %s, 0, '[]'::jsonb, %s)
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
                 ON CONFLICT (user_email, month) DO NOTHING
                 """,
-                (user_email, month, plan),
+                (user_email, month),
             )
             
             # Get current usage
@@ -897,11 +897,11 @@ def export_leads_batch():
             # Ensure usage record exists for this month
             cur.execute(
                 """
-                INSERT INTO usage (user_email, month, used, used_ids, plan)
-                VALUES (%s, %s, 0, '[]'::jsonb, %s)
+                INSERT INTO usage (user_email, month, used, used_ids)
+                VALUES (%s, %s, 0, '[]'::jsonb)
                 ON CONFLICT (user_email, month) DO NOTHING
                 """,
-                (user_email, month, plan),
+                (user_email, month),
             )
             
             # Get current usage
