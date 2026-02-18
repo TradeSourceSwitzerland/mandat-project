@@ -177,7 +177,7 @@ async function loadDashboard() {
       }
       
     } else {
-      // Silent redirect - token invalid or expired
+      // Silent redirect - authentication or server error
       window.location.href = "/login";
     }
   } catch (error) {
