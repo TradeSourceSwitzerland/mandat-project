@@ -100,7 +100,7 @@ async function loadDashboard() {
   const token = localStorage.getItem("auth_token");
   
   if (!token) {
-    alert("🔐 Du musst eingeloggt sein");
+    // Silent redirect - no alert needed
     window.location.href = "/login";
     return;
   }
@@ -177,12 +177,12 @@ async function loadDashboard() {
       }
       
     } else {
-      alert("❌ Fehler beim Laden der Dashboard-Daten");
+      // Silent redirect - token invalid or expired
       window.location.href = "/login";
     }
   } catch (error) {
     console.error("Dashboard load error:", error);
-    alert("❌ Fehler beim Laden des Dashboards");
+    // Silent redirect on error
     window.location.href = "/login";
   }
 }
