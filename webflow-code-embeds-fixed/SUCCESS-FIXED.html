@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Zahlungsbestätigung</title>
+</head>
+<body>
+    <script>
+        /**
+         * SUCCESS PAGE - Stripe Payment Confirmation
+         * 
+         * This script runs after successful Stripe payment and:
+         * 1. Calls backend to sync the purchased plan to database
+         * 2. Updates localStorage for frontend compatibility
+         * 3. Redirects user to dashboard
+         * 
+         * URL Format: /success?plan=basic&session_id=cs_xxxxx
+         */
+        (async function() {
+            const params = new URLSearchParams(window.location.search);
+            const sessionId = params.get("session_id");
+            const planParam = params.get("plan");
+            
+            if (!sessionId) {
+                console.error("Missing session_id in URL");
+                // Redirect to dashboard after delay even without session_id
+                setTimeout(() => location.assign("/dashboard"), 2000);
+                return;
+            }
+
+            try {
+                // ✅ Backend call to verify session and sync plan to database
+                const res = await fetch("https://mandat-backend.onrender.com/zevix/verify-session", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",  // Include session cookies
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    console.log("✅ Payment verified successfully:", data);
+                    
+                    // Update localStorage for frontend compatibility
+                    const VALID_PLANS = ["basic", "business", "enterprise"];
+                    const PLAN = VALID_PLANS.includes(planParam) ? planParam : "basic";
+                    const DAYS = 30;
+                    const authUntil = Date.now() + DAYS * 24 * 60 * 60 * 1000;
+                    
+                    localStorage.setItem("auth_until", String(authUntil));
+                    localStorage.setItem("plan", PLAN);
+                    localStorage.setItem("stripe_session", sessionId);
+                    
+                    // Redirect to dashboard after short delay
+                    setTimeout(() => location.assign("/dashboard"), 1500);
+                } else {
+                    console.error("❌ Payment verification failed:", data);
+                    
+                    // Retry: reload the page to trigger verification again
+                    setTimeout(() => location.reload(), 3000);
+                }
+            } catch (err) {
+                console.error("❌ Verify session error:", err);
+                
+                // Fallback: Set localStorage and redirect anyway
+                // Backend will sync on next dashboard load via /refresh-token
+                const VALID_PLANS = ["basic", "business", "enterprise"];
+                const PLAN = VALID_PLANS.includes(planParam) ? planParam : "basic";
+                const DAYS = 30;
+                const authUntil = Date.now() + DAYS * 24 * 60 * 60 * 1000;
+                
+                localStorage.setItem("auth_until", String(authUntil));
+                localStorage.setItem("plan", PLAN);
+                localStorage.setItem("stripe_session", sessionId);
+                
+                setTimeout(() => location.assign("/dashboard"), 2000);
+            }
+        })();
+    </script>
+    
+    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1>✅ Zahlung erfolgreich!</h1>
+        <p>Ihr Abonnement wird verarbeitet...</p>
+        <p>Sie werden in Kürze zum Dashboard weitergeleitet.</p>
+    </div>
+</body>
+</html>
