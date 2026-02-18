@@ -937,16 +937,31 @@ def export_leads_batch():
             can_export = min(len(new_ids), remaining_before)
             
             if can_export == 0:
-                return jsonify({
-                    "success": False,
-                    "error": "monthly_limit_exceeded" if remaining_before == 0 else "all_leads_already_used",
-                    "message": f"You have 0 leads remaining ({used}/{limit})" if remaining_before == 0 else "All selected leads have already been exported",
-                    "used": used,
-                    "remaining": remaining_before,
-                    "limit": limit,
-                    "new_ids": [],
-                    "duplicate_ids": duplicate_ids
-                }), 403
+                # Only block if monthly limit is actually exhausted
+                if remaining_before == 0:
+                    return jsonify({
+                        "success": False,
+                        "error": "monthly_limit_exceeded",
+                        "message": f"You have 0 leads remaining ({used}/{limit})",
+                        "used": used,
+                        "remaining": 0,
+                        "limit": limit,
+                        "new_ids": [],
+                        "duplicate_ids": duplicate_ids
+                    }), 403
+                else:
+                    # All duplicates - allow export, but don't consume any leads
+                    return jsonify({
+                        "success": True,
+                        "used": used,
+                        "remaining": remaining_before,
+                        "limit": limit,
+                        "new_ids": [],
+                        "duplicate_ids": duplicate_ids,
+                        "not_exported": [],
+                        "month": month,
+                        "message": f"All {len(duplicate_ids)} lead(s) already exported (no consumption). {remaining_before} leads remaining"
+                    })
             
             # Only export the leads we can afford
             ids_to_export = new_ids[:can_export]
