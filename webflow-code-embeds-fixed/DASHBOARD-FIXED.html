@@ -1,0 +1,215 @@
+<!-- ========================================================================= -->
+<!-- WEBFLOW CODE EMBED: DASHBOARD (FIXED)                                    -->
+<!-- ========================================================================= -->
+<!-- Fügen Sie dies in ein Code Embed Element auf der Dashboard-Seite ein     -->
+<!-- ========================================================================= -->
+
+<style>
+  #zevix-app {
+    font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background:#f4f6fb;
+  }
+  #zevix-app *{
+    box-sizing:border-box;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #zevix-app .wrap {
+    display:flex;
+    justify-content:center;
+    padding-top:100px;
+    padding-bottom:40px;
+    background: radial-gradient(1200px 600px at 50% -10%, #dbe7ff, transparent),
+    linear-gradient(180deg,#f7f9ff,#eef2f8);
+  }
+  #zevix-app .card {
+    width:100%;
+    max-width:540px;
+    background:#ffffff;
+    border-radius:22px;
+    padding:28px;
+    box-shadow: 0 20px 50px rgba(15,23,42,.12), 0 2px 6px rgba(15,23,42,.06);
+  }
+  #zevix-app h2 { margin:0 0 6px; font-size:22px; font-weight:800; letter-spacing:-.3px; text-align:center; }
+  #zevix-app p { margin:0 0 18px; font-size:14px; color:#6b7280; text-align:center; }
+  #zevix-app .grid { display:grid; grid-template-columns:1fr; gap:12px; margin:16px 0 18px; }
+  #zevix-app .box { background:#f9fafb; border:1px solid #e5e7eb; border-radius:16px; padding:14px; font-size:14px; }
+  #zevix-app .badge { display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; background:#eef2ff; color:#1e40af; }
+  #zevix-app .btn { display:block; width:100%; text-align:center; padding:14px; border-radius:14px; border:none; background:linear-gradient(180deg,#2563eb,#1e40af); color:#fff; font-weight:700; font-size:15px; cursor:pointer; text-decoration:none; box-shadow:0 14px 28px rgba(37,99,235,.35); }
+  #zevix-app .btn.secondary { margin-top:10px; background:linear-gradient(180deg,#111827,#0b1220); box-shadow:none; }
+  #zevix-app .btn:disabled, #zevix-app .btn.disabled { opacity:.6; cursor:not-allowed; pointer-events:none; }
+</style>
+
+<div id="zevix-app">
+  <div class="wrap">
+    <div class="card">
+      <h2>Dashboard</h2>
+      <p>Dein geschützter Bereich</p>
+
+      <div class="grid">
+        <div class="box">
+          <b>Abo</b>
+          <span class="badge" id="subStatus">⏳ Lädt...</span>
+        </div>
+
+        <div class="box">
+          <b>Gültig bis</b>
+          <span id="validUntil">⏳ Lädt...</span>
+        </div>
+
+        <div class="box">
+          <b>Leads verfügbar</b>
+          <span id="leadCount">⏳ Lädt...</span>
+        </div>
+      </div>
+
+      <a class="btn" id="btnLeads" href="/leads">Leads anzeigen</a>
+      <a class="btn secondary" href="/preise">Abo verwalten</a>
+      <a class="btn secondary" href="#" onclick="logout(); return false;">Logout</a>
+
+      <div class="mini" id="note"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ✅ FIX 1: Absolute API URL
+const API = "https://mandat-backend.onrender.com";
+
+function formatDateTimeCH(ts) {
+  try {
+    return new Date(ts).toLocaleString("de-CH", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit"
+    });
+  } catch (e) {
+    return "—";
+  }
+}
+
+// Check if user is logged in
+(function() {
+  const until = Number(localStorage.getItem("auth_until") || 0);
+  if (!until || Date.now() > until) {
+    window.location.replace("/login");
+    return;
+  }
+})();
+
+// ✅ FIX 2: Load data from backend via refresh-token
+async function loadDashboard() {
+  const token = localStorage.getItem("auth_token");
+  
+  if (!token) {
+    alert("🔐 Du musst eingeloggt sein");
+    window.location.href = "/login";
+    return;
+  }
+  
+  try {
+    const response = await fetch(API + "/zevix/refresh-token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify({ token })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // ✅ FIX 3: Update localStorage with fresh data from backend
+      localStorage.setItem("auth_token", data.token);
+      localStorage.setItem("auth_until", data.valid_until || data.auth_until);
+      localStorage.setItem("plan", data.plan);
+      localStorage.setItem("zevix_email", data.email);
+      
+      const month = data.month || new Date().toISOString().slice(0, 7);
+      const used = data.used || 0;
+      localStorage.setItem(`zevix_leads_used_${month}`, used);
+      
+      // Display user info
+      const planLabel = {
+        basic: "Basic (50 CHF)",
+        business: "Business (100 CHF)",
+        enterprise: "Enterprise (200 CHF)",
+        none: "Kein aktives Abo"
+      };
+      
+      document.getElementById("subStatus").textContent = planLabel[data.plan] || "Kein Abo";
+      
+      const until = data.valid_until || data.auth_until;
+      document.getElementById("validUntil").textContent = formatDateTimeCH(until);
+      
+      // Calculate limit based on plan
+      const PLAN_LIMITS = {
+        basic: 500,
+        business: 1000,
+        enterprise: 4500,
+        none: 0
+      };
+      
+      const limit = PLAN_LIMITS[data.plan] || 0;
+      const remaining = Math.max(0, limit - used);
+      
+      document.getElementById("leadCount").textContent = `${remaining} von ${limit}`;
+      
+      // Check warnings
+      const noteEl = document.getElementById("note");
+      const daysLeft = Math.ceil((until - Date.now()) / (24 * 60 * 60 * 1000));
+      
+      if (daysLeft <= 3) {
+        noteEl.textContent = `⚠️ Dein Abo läuft in ${daysLeft} Tag(en) ab.`;
+      } else {
+        noteEl.textContent = "";
+      }
+      
+      const btn = document.getElementById("btnLeads");
+      
+      if (data.plan === "none") {
+        btn.classList.add("disabled");
+        btn.textContent = "Leads (Abo erforderlich)";
+        document.getElementById("leadCount").textContent = "Abo benötigt";
+        noteEl.textContent = "Bitte zuerst ein Abo abschliessen.";
+      } else if (remaining <= 0) {
+        btn.classList.add("disabled");
+        btn.textContent = "Leads (Limit erreicht)";
+      }
+      
+    } else {
+      alert("❌ Fehler beim Laden der Dashboard-Daten");
+      window.location.href = "/login";
+    }
+  } catch (error) {
+    console.error("Dashboard load error:", error);
+    alert("❌ Fehler beim Laden des Dashboards");
+    window.location.href = "/login";
+  }
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.replace("/login");
+}
+
+// ✅ FIX 4: Load dashboard data on page load
+loadDashboard();
+
+// Session check every 30 seconds
+setInterval(() => {
+  const until = Number(localStorage.getItem("auth_until") || 0);
+  if (!until || Date.now() > until) {
+    localStorage.clear();
+    window.location.replace("/login");
+  }
+}, 30000);
+</script>
+
+<!-- ========================================================================= -->
+<!-- WICHTIGE ÄNDERUNGEN (FIXES):                                              -->
+<!-- ========================================================================= -->
+<!-- 1. ✅ Absolute API URL statt relative                                     -->
+<!-- 2. ✅ Lädt Daten vom Backend via /zevix/refresh-token                     -->
+<!-- 3. ✅ Update localStorage mit frischen Daten vom Backend                  -->
+<!-- 4. ✅ Zeigt echte Usage-Daten statt nur localStorage                      -->
+<!-- ========================================================================= -->

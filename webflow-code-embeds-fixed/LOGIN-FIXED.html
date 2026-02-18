@@ -1,0 +1,195 @@
+<!-- ========================================================================= -->
+<!-- WEBFLOW CODE EMBED: LOGIN (FIXED)                                        -->
+<!-- ========================================================================= -->
+<!-- Fügen Sie dies in ein Code Embed Element auf der Login-Seite ein         -->
+<!-- ========================================================================= -->
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background: #f4f6fb;
+  }
+  .login-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(1200px 600px at 50% -10%, #dbe7ff, transparent), linear-gradient(180deg, #f7f9ff, #eef2f8);
+  }
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    padding: 34px 26px 30px;
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 20px 50px rgba(15,23,42,.12), 0 2px 6px rgba(15,23,42,.06);
+  }
+  .login-card h2 { margin: 0 0 6px; font-size: 24px; font-weight: 700; text-align: center; }
+  .login-card p { margin: 0 0 26px; font-size: 14px; color: #6b7280; text-align: center; }
+  .login-card input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    font-size: 15px;
+    margin-bottom: 16px;
+    background: #f9fafb;
+  }
+  .login-card input:focus {
+    outline: none;
+    background: #fff;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37,99,235,.15);
+  }
+  .login-card button {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(180deg, #2563eb, #1e40af);
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: 0 14px 28px rgba(37,99,235,.35);
+  }
+  .login-error { margin-top: 14px; font-size: 13px; color: #dc2626; text-align: center; display: none; }
+  .switch-link { margin-top: 18px; text-align: center; font-size: 14px; }
+  .switch-link a { color: #2563eb; font-weight: 600; text-decoration: none; cursor: pointer; }
+</style>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <h2 id="formTitle">Login</h2>
+    <p id="formSubtitle">Geschützter Bereich</p>
+
+    <input type="email" id="email" placeholder="E-Mail">
+    <input type="password" id="password" placeholder="Passwort">
+
+    <button id="submitBtn">Einloggen</button>
+
+    <div class="login-error" id="errorBox">Fehler</div>
+
+    <div class="switch-link">
+      <span id="switchText">Noch kein Konto?</span>
+      <a onclick="toggleMode()" id="switchLink">Registrieren</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ✅ FIX 1: Absolute API URLs
+const API_LOGIN = "https://mandat-backend.onrender.com/zevix/login";
+const API_REGISTER = "https://mandat-backend.onrender.com/zevix/register";
+const TARGET_PAGE = "/dashboard";
+
+let mode = "login";
+
+function toggleMode(){
+  const title = document.getElementById("formTitle");
+  const btn = document.getElementById("submitBtn");
+  const switchText = document.getElementById("switchText");
+  const switchLink = document.getElementById("switchLink");
+  const err = document.getElementById("errorBox");
+
+  err.style.display = "none";
+
+  if (mode === "login") {
+    mode = "register";
+    title.innerText = "Registrieren";
+    btn.innerText = "Account erstellen";
+    switchText.innerText = "Schon registriert?";
+    switchLink.innerText = "Zum Login";
+  } else {
+    mode = "login";
+    title.innerText = "Login";
+    btn.innerText = "Einloggen";
+    switchText.innerText = "Noch kein Konto?";
+    switchLink.innerText = "Registrieren";
+  }
+}
+
+document.getElementById("submitBtn").addEventListener("click", submit);
+document.getElementById("password").addEventListener("keydown", e => {
+  if (e.key === "Enter") submit();
+});
+
+async function submit() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const err = document.getElementById("errorBox");
+
+  err.style.display = "none";
+
+  if (!email || !password) {
+    err.innerText = "Bitte E-Mail und Passwort eingeben";
+    err.style.display = "block";
+    return;
+  }
+
+  const API = mode === "login" ? API_LOGIN : API_REGISTER;
+
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // ✅ FIX 2: Credentials für Session-Cookies
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      err.innerText = mode === "login" ? "Login fehlgeschlagen" : "User existiert bereits";
+      err.style.display = "block";
+      return;
+    }
+
+    if (mode === "register") {
+      toggleMode();
+      err.innerText = "Registrierung erfolgreich. Jetzt einloggen.";
+      err.style.display = "block";
+      err.style.color = "green";
+      return;
+    }
+
+    // ✅ FIX 3: Speichere ALLE notwendigen Daten inkl. auth_token
+    const until = data.auth_until || data.valid_until || (Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const plan = data.plan || "basic";
+    const month = data.month || new Date().toISOString().slice(0, 7);
+    const used = (typeof data.used === "number" ? data.used : 0);
+
+    localStorage.setItem("auth_until", String(until));
+    localStorage.setItem("plan", plan);
+    localStorage.setItem("zevix_email", data.email || email);
+    localStorage.setItem(`zevix_leads_used_${month}`, String(used));
+    
+    // ✅ FIX 4: WICHTIG - Auth Token speichern!
+    if (data.token) {
+      localStorage.setItem("auth_token", data.token);
+    }
+
+    // Weiterleitung zum Dashboard
+    window.location.href = TARGET_PAGE;
+
+  } catch (e) {
+    console.error("Login error:", e);
+    err.innerText = "Server nicht erreichbar";
+    err.style.display = "block";
+  }
+}
+</script>
+
+<!-- ========================================================================= -->
+<!-- WICHTIGE ÄNDERUNGEN (FIXES):                                              -->
+<!-- ========================================================================= -->
+<!-- 1. ✅ Absolute API URLs statt relative                                    -->
+<!-- 2. ✅ credentials: "include" für Session-Cookies                          -->
+<!-- 3. ✅ Speichert auth_token zu localStorage                                -->
+<!-- 4. ✅ Speichert alle notwendigen Daten vom Backend                        -->
+<!-- ========================================================================= -->
