@@ -182,6 +182,31 @@
                     body: JSON.stringify({ lead_ids: leadIds })
                 });
                 
+                // ✅ FIX 7: Check HTTP status before parsing JSON
+                if (!response.ok) {
+                    let errorMsg = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || errorData.error || errorMsg;
+                    } catch (e) {
+                        // If JSON parsing fails, use status text
+                        errorMsg = response.statusText || errorMsg;
+                    }
+                    
+                    // Provide specific error messages based on status code
+                    if (response.status === 401) {
+                        alert("🔐 Sitzung abgelaufen. Bitte melde dich erneut an.");
+                        window.location.href = "/login";
+                    } else if (response.status === 403) {
+                        alert(`🚫 Zugriff verweigert: ${errorMsg}`);
+                    } else if (response.status === 500) {
+                        alert(`⚠️ Server-Fehler: ${errorMsg}\n\nBitte versuche es später erneut.`);
+                    } else {
+                        alert(`❌ Fehler beim Lead-Export: ${errorMsg}`);
+                    }
+                    return false;
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -210,7 +235,13 @@
                 }
             } catch (error) {
                 console.error("Export error:", error);
-                alert("❌ Fehler beim Export: " + error.message);
+                // ✅ FIX 8: Show detailed error message with better context
+                const errorDetails = error.message || error.toString();
+                if (error.name === 'TypeError' && errorDetails.includes('fetch')) {
+                    alert("🌐 Netzwerkfehler: Bitte überprüfe deine Internetverbindung und versuche es erneut.");
+                } else {
+                    alert(`❌ Fehler beim Export: ${errorDetails}`);
+                }
                 return false;
             }
         }
