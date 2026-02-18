@@ -182,16 +182,18 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
                 new_plan = old_plan
 
             if old_plan != new_plan:
-                month = get_month_key()
                 cur.execute(
                     """
-                    UPDATE usage
-                    SET plan = %s
-                    WHERE user_email = %s AND month = %s
+                    UPDATE users
+                    SET plan = %s, valid_until = %s
+                    WHERE lower(email) = %s
                     """,
-                    (new_plan, email, month),
+                    (new_plan, default_auth_until_ms(), email),
                 )
                 conn.commit()
+                
+                # Invalidate cache for immediate synchronization
+                set_cached_stripe_plan(email, new_plan)
 
     return True, ""
 
@@ -286,10 +288,11 @@ def sync_user_plan_from_stripe(email: str, current_plan: str, force: bool = Fals
     if not force:
         cached_plan, cache_hit = get_cached_stripe_plan(email)
         if cache_hit:
-            # Return cached plan, but only if it's not a downgrade to "none"
-            # (we never downgrade from a paid plan to none based on cache alone)
-            if cached_plan != "none" or normalized_current_plan == "none":
+            # Only use cache when BOTH plans are not "none" (paid → paid transition)
+            # When plan is "none", always check Stripe fresh (user might have just purchased)
+            if cached_plan != "none" and normalized_current_plan != "none":
                 return cached_plan
+            # When plan is "none", skip cache and let Stripe check run
 
     # Request deduplication: check if another request is already processing this email
     with ACTIVE_STRIPE_REQUESTS_LOCK:
