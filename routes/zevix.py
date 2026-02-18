@@ -815,6 +815,176 @@ def export_lead():
             })
 
 
+# ---------------------------- EXPORT LEADS BATCH ----------------------------
+@zevix_bp.route("/zevix/export-leads-batch", methods=["POST"])
+def export_leads_batch():
+    """
+    Batch export multiple leads and tracks usage against the user's monthly plan limit.
+    
+    This endpoint:
+    - Validates user authentication via Bearer token
+    - Accepts a list of lead IDs
+    - Filters out already exported IDs (duplicates)
+    - Counts only new leads against monthly limit
+    - Returns used, remaining, limit, new_ids, and duplicate_ids
+    """
+    # Check if user is logged in (via Bearer token or session)
+    # Try Bearer token from Authorization header first
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()  # Remove "Bearer " prefix (case-insensitive)
+    
+    user_email = None
+    
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_email = payload.get("email")
+        except jwt.ExpiredSignatureError:
+            logging.warning("JWT token expired for export-leads-batch request")
+        except jwt.InvalidTokenError:
+            logging.warning("Invalid JWT token for export-leads-batch request")
+    
+    # Fall back to session-based authentication
+    if not user_email:
+        user_email = session.get("email")
+    
+    if not user_email:
+        return jsonify({"success": False, "error": "not_authenticated"}), 401
+    
+    data = request_payload()
+    lead_ids = data.get("lead_ids")
+    
+    if not lead_ids or not isinstance(lead_ids, list):
+        return jsonify({"success": False, "error": "missing_lead_ids"}), 400
+    
+    # Filter out empty lead IDs
+    lead_ids = [str(lid).strip() for lid in lead_ids if lid]
+    
+    if not lead_ids:
+        return jsonify({"success": False, "error": "no_valid_lead_ids"}), 400
+    
+    month = get_month_key()
+    
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Get user's current plan
+            cur.execute(
+                """
+                SELECT plan
+                FROM users
+                WHERE lower(email)=%s
+                """,
+                (user_email.lower(),),
+            )
+            user_data = cur.fetchone()
+            
+            if not user_data:
+                return jsonify({"success": False, "error": "user_not_found"}), 404
+            
+            plan = normalize_plan(user_data.get("plan"))
+            limit = get_leads_limit(plan)
+            
+            # If user has no plan or limit is 0, deny export
+            if limit == 0:
+                return jsonify({
+                    "success": False,
+                    "error": "no_plan",
+                    "message": "You need an active plan to export leads"
+                }), 403
+            
+            # Ensure usage record exists for this month
+            cur.execute(
+                """
+                INSERT INTO usage (user_email, month, used, used_ids, plan)
+                VALUES (%s, %s, 0, '[]'::jsonb, %s)
+                ON CONFLICT (user_email, month) DO NOTHING
+                """,
+                (user_email, month, plan),
+            )
+            
+            # Get current usage
+            cur.execute(
+                """
+                SELECT used, used_ids
+                FROM usage
+                WHERE user_email=%s AND month=%s
+                """,
+                (user_email, month),
+            )
+            usage = cur.fetchone() or {}
+            used = int(usage.get("used", 0))
+            used_ids_raw = usage.get("used_ids")
+            
+            # Ensure used_ids is a list (handle both JSONB and string cases)
+            if isinstance(used_ids_raw, str):
+                used_ids = json.loads(used_ids_raw) if used_ids_raw else []
+            elif isinstance(used_ids_raw, list):
+                used_ids = used_ids_raw
+            else:
+                used_ids = []
+            
+            # Convert to set for O(n) performance instead of O(n²)
+            used_ids_set = set(used_ids)
+            
+            # Filter out duplicates - only keep lead IDs that haven't been used yet
+            new_ids = [lid for lid in lead_ids if lid not in used_ids_set]
+            duplicate_ids = [lid for lid in lead_ids if lid in used_ids_set]
+            
+            # Calculate how many new leads we can actually export
+            remaining_before = limit - used
+            can_export = min(len(new_ids), remaining_before)
+            
+            if can_export == 0:
+                return jsonify({
+                    "success": False,
+                    "error": "monthly_limit_exceeded" if remaining_before == 0 else "all_leads_already_used",
+                    "message": f"You have 0 leads remaining ({used}/{limit})" if remaining_before == 0 else "All selected leads have already been exported",
+                    "used": used,
+                    "remaining": remaining_before,
+                    "limit": limit,
+                    "new_ids": [],
+                    "duplicate_ids": duplicate_ids
+                }), 403
+            
+            # Only export the leads we can afford
+            ids_to_export = new_ids[:can_export]
+            ids_not_exported = new_ids[can_export:]
+            
+            # Increment usage and add lead_ids to used_ids
+            new_used = used + len(ids_to_export)
+            new_used_ids = used_ids + ids_to_export
+            
+            cur.execute(
+                """
+                UPDATE usage
+                SET used = %s, used_ids = %s::jsonb
+                WHERE user_email = %s AND month = %s
+                """,
+                (new_used, json.dumps(new_used_ids), user_email, month),
+            )
+            conn.commit()
+            
+            # Update session with new values
+            session["used"] = new_used
+            session["used_ids"] = new_used_ids
+            
+            remaining = limit - new_used
+            
+            return jsonify({
+                "success": True,
+                "used": new_used,
+                "remaining": remaining,
+                "limit": limit,
+                "new_ids": ids_to_export,
+                "duplicate_ids": duplicate_ids,
+                "not_exported": ids_not_exported,
+                "month": month,
+                "message": f"Successfully exported {len(ids_to_export)} lead(s). {remaining} leads remaining"
+            })
+
+
 # ---------------------------- CREATE CHECKOUT SESSION ----------------------------
 @zevix_bp.route("/zevix/create-checkout-session", methods=["POST"])
 def create_checkout_session():

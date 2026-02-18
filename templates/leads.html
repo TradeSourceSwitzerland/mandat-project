@@ -1,96 +1,273 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lead Management</title>
-    <script>
-        const apiUrl = 'https://api.yourdomain.com';
-        let token = '';
-
-        function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            fetch(`${apiUrl}/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                token = data.token;
-                alert('Login successful!');
-                fetchLeads();
-            })
-            .catch(error => console.error('Error:', error));
+    <title>Zevix - Leads</title>
+    <style>
+        .lead-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            cursor: pointer;
         }
-
-        function fetchLeads() {
-            fetch(`${apiUrl}/leads`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            .then(response => response.json())
-            .then(data => {
-                let leadsList = document.getElementById('leadsList');
-                leadsList.innerHTML = '';
-                data.forEach(lead => {
-                    leadsList.innerHTML += `<li>${lead.name} - ${lead.email}</li>`;
-                });
-            })
-            .catch(error => console.error('Error:', error));
+        .lead-item.selected {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
         }
-
-        function exportCSV() {
-            fetch(`${apiUrl}/export/csv`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            .then(response => response.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'leads.csv';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => console.error('Error:', error));
+        .stats {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
         }
-
-        function exportPDF() {
-            fetch(`${apiUrl}/export/pdf`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            .then(response => response.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'leads.pdf';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => console.error('Error:', error));
-        }
-    </script>
+    </style>
 </head>
 <body>
-    <h1>Lead Management System</h1>
-    <div>
-        <label for="username">Username:</label>
-        <input type="text" id="username" />
-        <label for="password">Password:</label>
-        <input type="password" id="password" />
-        <button onclick="login()">Login</button>
+    <h1>Zevix - Lead Management</h1>
+    
+    <div class="stats">
+        <p>E-Mail: <span id="userEmail">-</span></p>
+        <p>Plan: <span id="userPlan">-</span></p>
+        <p>Leads verwendet: <span id="leadsUsed">0</span> / <span id="leadsLimit">0</span></p>
+        <p>Verbleibend: <span id="leadsRemaining">0</span></p>
     </div>
-    <ul id="leadsList"></ul>
-    <button onclick="exportCSV()">Export to CSV</button>
-    <button onclick="exportPDF()">Export to PDF</button>
+    
+    <div>
+        <button id="selectAllBtn">Alle auswählen</button>
+        <button id="deselectAllBtn">Auswahl aufheben</button>
+        <button id="exportCSVBtn">CSV Export (Ausgewählte)</button>
+        <button id="exportPDFBtn">PDF Export (Ausgewählte)</button>
+        <a href="/dashboard">Zum Dashboard</a>
+    </div>
+    
+    <div id="leadsList">
+        <!-- Sample leads for demonstration -->
+        <div class="lead-item" data-lead-id="lead-001">
+            <strong>Max Mustermann</strong> - max.mustermann@example.com
+        </div>
+        <div class="lead-item" data-lead-id="lead-002">
+            <strong>Anna Schmidt</strong> - anna.schmidt@example.com
+        </div>
+        <div class="lead-item" data-lead-id="lead-003">
+            <strong>Peter Müller</strong> - peter.mueller@example.com
+        </div>
+    </div>
+
+    <script>
+        // ✅ FIX 1: Use absolute API URL
+        const API = "https://mandat-backend.onrender.com";
+        
+        let selectedLeads = new Set();
+        let currentMonth = "";
+        let currentUsed = 0;
+        let currentLimit = 0;
+        
+        // Initialize page
+        async function initPage() {
+            const token = localStorage.getItem("auth_token");
+            
+            if (!token) {
+                alert("🔐 Du musst eingeloggt sein, um Leads zu exportieren");
+                window.location.href = "/login";
+                return;
+            }
+            
+            // ✅ FIX 5: Load usage data from backend on page load
+            try {
+                const response = await fetch(API + "/zevix/refresh-token", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ token })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update localStorage with fresh data
+                    localStorage.setItem("auth_token", data.token);
+                    localStorage.setItem("auth_until", data.valid_until);
+                    localStorage.setItem("plan", data.plan);
+                    localStorage.setItem("zevix_email", data.email);
+                    
+                    currentMonth = data.month;
+                    currentUsed = data.used || 0;
+                    
+                    // ✅ FIX 6: Keep localStorage synchronized
+                    localStorage.setItem(`zevix_leads_used_${currentMonth}`, currentUsed);
+                    
+                    // Calculate limit based on plan
+                    const limits = {
+                        "none": 0,
+                        "basic": 500,
+                        "business": 1000,
+                        "enterprise": 4500
+                    };
+                    currentLimit = limits[data.plan] || 0;
+                    
+                    // Update UI
+                    document.getElementById("userEmail").textContent = data.email;
+                    document.getElementById("userPlan").textContent = data.plan;
+                    updateUsageDisplay();
+                } else {
+                    alert("❌ Fehler beim Laden der Nutzungsdaten");
+                    window.location.href = "/login";
+                }
+            } catch (error) {
+                console.error("Init error:", error);
+                alert("❌ Fehler beim Initialisieren der Seite");
+            }
+        }
+        
+        function updateUsageDisplay() {
+            const remaining = Math.max(0, currentLimit - currentUsed);
+            document.getElementById("leadsUsed").textContent = currentUsed;
+            document.getElementById("leadsLimit").textContent = currentLimit;
+            document.getElementById("leadsRemaining").textContent = remaining;
+        }
+        
+        // Handle lead selection
+        document.getElementById("leadsList").addEventListener("click", function(e) {
+            const leadItem = e.target.closest(".lead-item");
+            if (leadItem) {
+                const leadId = leadItem.dataset.leadId;
+                if (selectedLeads.has(leadId)) {
+                    selectedLeads.delete(leadId);
+                    leadItem.classList.remove("selected");
+                } else {
+                    selectedLeads.add(leadId);
+                    leadItem.classList.add("selected");
+                }
+            }
+        });
+        
+        // Select all leads
+        document.getElementById("selectAllBtn").addEventListener("click", function() {
+            selectedLeads.clear();
+            document.querySelectorAll(".lead-item").forEach(item => {
+                const leadId = item.dataset.leadId;
+                selectedLeads.add(leadId);
+                item.classList.add("selected");
+            });
+        });
+        
+        // Deselect all leads
+        document.getElementById("deselectAllBtn").addEventListener("click", function() {
+            selectedLeads.clear();
+            document.querySelectorAll(".lead-item").forEach(item => {
+                item.classList.remove("selected");
+            });
+        });
+        
+        // ✅ FIX 2 & 3: Use batch endpoint and send all lead IDs
+        async function consumeLeadsViaAPI(leadIds) {
+            const token = localStorage.getItem("auth_token");
+            
+            if (!token) {
+                alert("🔐 Du musst eingeloggt sein, um Leads zu exportieren");
+                return false;
+            }
+            
+            try {
+                const response = await fetch(API + "/zevix/export-leads-batch", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ lead_ids: leadIds })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUsed = data.used;
+                    
+                    // ✅ FIX 6: Update localStorage with new usage
+                    localStorage.setItem(`zevix_leads_used_${currentMonth}`, currentUsed);
+                    
+                    updateUsageDisplay();
+                    
+                    // Build message with multiple parts
+                    const messageParts = [data.message];
+                    
+                    if (data.duplicate_ids && data.duplicate_ids.length > 0) {
+                        messageParts.push(`⚠️ ${data.duplicate_ids.length} Lead(s) bereits exportiert (übersprungen)`);
+                    }
+                    if (data.not_exported && data.not_exported.length > 0) {
+                        messageParts.push(`⚠️ ${data.not_exported.length} Lead(s) nicht exportiert (Limit erreicht)`);
+                    }
+                    
+                    alert(messageParts.join('\n'));
+                    return true;
+                } else {
+                    alert("❌ Export fehlgeschlagen: " + (data.message || data.error));
+                    return false;
+                }
+            } catch (error) {
+                console.error("Export error:", error);
+                alert("❌ Fehler beim Export: " + error.message);
+                return false;
+            }
+        }
+        
+        // Export CSV
+        document.getElementById("exportCSVBtn").addEventListener("click", async function() {
+            if (selectedLeads.size === 0) {
+                alert("⚠️ Bitte wähle mindestens einen Lead aus");
+                return;
+            }
+            
+            const leadIds = Array.from(selectedLeads);
+            const success = await consumeLeadsViaAPI(leadIds);
+            
+            if (success) {
+                // Generate CSV
+                let csv = "Name,Email\n";
+                leadIds.forEach(leadId => {
+                    const leadItem = document.querySelector(`[data-lead-id="${leadId}"]`);
+                    if (leadItem) {
+                        const text = leadItem.textContent.trim();
+                        csv += text + "\n";
+                    }
+                });
+                
+                // Download CSV
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `leads-${Date.now()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+        });
+        
+        // ✅ FIX 4: PDF Export with tracking
+        document.getElementById("exportPDFBtn").addEventListener("click", async function() {
+            if (selectedLeads.size === 0) {
+                alert("⚠️ Bitte wähle mindestens einen Lead aus");
+                return;
+            }
+            
+            const leadIds = Array.from(selectedLeads);
+            
+            // First, track the leads via API
+            const success = await consumeLeadsViaAPI(leadIds);
+            
+            if (success) {
+                alert("✅ PDF-Export erfolgreich verbucht!\n\n⚠️ Hinweis: Die PDF-Generierung ist derzeit im Frontend noch nicht implementiert. Die Leads wurden aber korrekt von deinem Kontingent abgezogen.\n\nBitte verwende vorerst den CSV-Export.");
+            }
+        });
+        
+        // Initialize page on load
+        initPage();
+    </script>
 </body>
 </html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zevix - Dashboard</title>
+</head>
+<body>
+    <h1>Zevix Dashboard</h1>
+    
+    <div id="userInfo">
+        <p>E-Mail: <span id="userEmail">-</span></p>
+        <p>Plan: <span id="userPlan">-</span></p>
+        <p>Leads verwendet: <span id="leadsUsed">0</span> / <span id="leadsLimit">0</span></p>
+        <p>Verbleibend: <span id="leadsRemaining">0</span></p>
+    </div>
+    
+    <div>
+        <a href="/leads">Zu den Leads</a>
+        <button id="logoutBtn">Ausloggen</button>
+    </div>
+
+    <script>
+        const API = "https://mandat-backend.onrender.com";
+        
+        async function loadDashboard() {
+            const token = localStorage.getItem("auth_token");
+            
+            if (!token) {
+                alert("🔐 Du musst eingeloggt sein");
+                window.location.href = "/login";
+                return;
+            }
+            
+            try {
+                // ✅ FIX: Load usage data from backend via refresh-token
+                const response = await fetch(API + "/zevix/refresh-token", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ token })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update localStorage with fresh data
+                    localStorage.setItem("auth_token", data.token);
+                    localStorage.setItem("auth_until", data.valid_until);
+                    localStorage.setItem("plan", data.plan);
+                    localStorage.setItem("zevix_email", data.email);
+                    
+                    const month = data.month;
+                    const used = data.used || 0;
+                    localStorage.setItem(`zevix_leads_used_${month}`, used);
+                    
+                    // Display user info
+                    document.getElementById("userEmail").textContent = data.email;
+                    document.getElementById("userPlan").textContent = data.plan;
+                    document.getElementById("leadsUsed").textContent = used;
+                    
+                    // Calculate limit based on plan
+                    const limits = {
+                        "none": 0,
+                        "basic": 500,
+                        "business": 1000,
+                        "enterprise": 4500
+                    };
+                    const limit = limits[data.plan] || 0;
+                    const remaining = Math.max(0, limit - used);
+                    
+                    document.getElementById("leadsLimit").textContent = limit;
+                    document.getElementById("leadsRemaining").textContent = remaining;
+                } else {
+                    alert("❌ Fehler beim Laden der Dashboard-Daten");
+                    window.location.href = "/login";
+                }
+            } catch (error) {
+                console.error("Dashboard load error:", error);
+                alert("❌ Fehler beim Laden des Dashboards");
+                window.location.href = "/login";
+            }
+        }
+        
+        document.getElementById("logoutBtn").addEventListener("click", async function() {
+            try {
+                await fetch(API + "/zevix/logout", {
+                    method: "POST",
+                    credentials: "include"
+                });
+            } catch (error) {
+                console.error("Logout error:", error);
+            }
+            
+            // Clear localStorage
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("auth_until");
+            localStorage.removeItem("plan");
+            localStorage.removeItem("zevix_email");
+            
+            window.location.href = "/login";
+        });
+        
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+</html>

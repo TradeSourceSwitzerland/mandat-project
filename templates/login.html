@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zevix - Login</title>
+</head>
+<body>
+    <h1>Zevix Login</h1>
+    <form id="loginForm">
+        <div>
+            <label for="email">E-Mail:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+            <label for="password">Passwort:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit">Einloggen</button>
+    </form>
+
+    <script>
+        const API = "https://mandat-backend.onrender.com";
+        
+        document.getElementById("loginForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            
+            try {
+                const response = await fetch(API + "/zevix/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Save auth data to localStorage
+                    localStorage.setItem("auth_until", data.auth_until);
+                    localStorage.setItem("plan", data.plan);
+                    localStorage.setItem("zevix_email", data.email);
+                    
+                    // Initialize leads used counter for current month
+                    const month = data.month;
+                    localStorage.setItem(`zevix_leads_used_${month}`, data.used);
+                    
+                    // ✅ FIX: Save auth_token to localStorage
+                    localStorage.setItem("auth_token", data.token);
+                    
+                    alert("✅ Login erfolgreich!");
+                    
+                    // Redirect to dashboard or leads page
+                    window.location.href = "/dashboard";
+                } else {
+                    alert("❌ Login fehlgeschlagen: " + (data.message || "Unbekannter Fehler"));
+                }
+            } catch (error) {
+                console.error("Login error:", error);
+                alert("❌ Fehler beim Login: " + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
