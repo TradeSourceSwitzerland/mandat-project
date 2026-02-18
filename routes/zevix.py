@@ -951,6 +951,7 @@ def export_leads_batch():
                     }), 403
                 else:
                     # All duplicates - allow export, but don't consume any leads
+                    lead_word = "lead" if len(duplicate_ids) == 1 else "leads"
                     return jsonify({
                         "success": True,
                         "used": used,
@@ -960,7 +961,7 @@ def export_leads_batch():
                         "duplicate_ids": duplicate_ids,
                         "not_exported": [],
                         "month": month,
-                        "message": f"All {len(duplicate_ids)} lead(s) already exported (no consumption). {remaining_before} leads remaining"
+                        "message": f"All {len(duplicate_ids)} {lead_word} already exported (no consumption). {remaining_before} leads remaining"
                     })
             
             # Only export the leads we can afford
