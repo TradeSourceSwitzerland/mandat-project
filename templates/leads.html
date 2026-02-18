@@ -237,7 +237,12 @@
                 console.error("Export error:", error);
                 // ✅ FIX 8: Show detailed error message with better context
                 const errorDetails = error.message || error.toString();
-                if (error.name === 'TypeError' && errorDetails.includes('fetch')) {
+                // Check for network-related errors more robustly
+                const isNetworkError = error instanceof TypeError || 
+                                     errorDetails.toLowerCase().includes('network') ||
+                                     errorDetails.toLowerCase().includes('failed to fetch');
+                
+                if (isNetworkError) {
                     alert("🌐 Netzwerkfehler: Bitte überprüfe deine Internetverbindung und versuche es erneut.");
                 } else {
                     alert(`❌ Fehler beim Export: ${errorDetails}`);

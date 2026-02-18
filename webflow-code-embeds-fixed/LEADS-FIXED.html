@@ -775,7 +775,12 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Export-Lead API Error:", err);
       // ✅ FIX 8: Show detailed error message instead of generic one
       const errorDetails = err.message || err.toString();
-      if (err.name === 'TypeError' && errorDetails.includes('fetch')) {
+      // Check for network-related errors more robustly
+      const isNetworkError = err instanceof TypeError || 
+                           errorDetails.toLowerCase().includes('network') ||
+                           errorDetails.toLowerCase().includes('failed to fetch');
+      
+      if (isNetworkError) {
         alert("🌐 Netzwerkfehler: Bitte überprüfe deine Internetverbindung und versuche es erneut.");
       } else {
         alert(`🚫 Fehler beim Lead-Verbrauch: ${errorDetails}`);
