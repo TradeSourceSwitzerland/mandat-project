@@ -1,6 +1,7 @@
 import os
 import ssl
 import base64
+import logging
 import smtplib
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
@@ -12,15 +13,44 @@ from email.mime.application import MIMEApplication
 # ZEVIX Route laden
 from routes.zevix import zevix_bp
 
+logging.basicConfig(level=logging.INFO)
+
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key")
 # HTTPS-Information von Reverse-Proxies (z. B. Render) korrekt übernehmen
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Cookies über Cross-Site Requests erlauben (Webflow -> Backend)
-CORS(app, supports_credentials=True)
+CORS(app,
+     supports_credentials=True,
+     origins=["https://www.zevix.ch", "https://zevix.ch", "https://zevix.webflow.io"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
+
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='None',  # Required for cross-origin cookies
+    SESSION_COOKIE_DOMAIN=None
+)
+
 # ZEVIX Blueprint registrieren
 app.register_blueprint(zevix_bp)
+
+
+@app.before_request
+def log_request():
+    logging.info("Incoming request: %s %s from %s", request.method, request.path, request.remote_addr)
+
+
+@app.route("/zevix/login", methods=["OPTIONS"])
+def login_options():
+    response = jsonify({"status": "ok"})
+    response.headers.add("Access-Control-Allow-Origin", request.headers.get("Origin"))
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "POST,OPTIONS")
+    response.headers.add("Access-Control-Allow-Credentials", "true")
+    return response, 200
 # ----------------------------
 # Health‑Check für Wake‑Up Pings
 # ----------------------------

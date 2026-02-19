@@ -474,92 +474,104 @@ def register():
 # ---------------------------- LOGIN ----------------------------
 @zevix_bp.route("/zevix/login", methods=["POST"])
 def login():
-    data = request_payload()
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
+    email = ""
+    try:
+        logging.info("Login attempt received from %s", request.remote_addr)
 
-    if not email or not password:
-        return jsonify({"success": False, "message": "missing"}), 400
+        data = request_payload()
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            user = find_user_by_email(cur, email)
-            if not user:
-                return jsonify({"success": False, "message": "not_found"}), 404
-            if not verify_password(password, user.get("password")):
-                return jsonify({"success": False, "message": "wrong_password"}), 401
+        logging.debug("Login attempt for email: %s", email)
 
-    month = get_month_key()
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT plan, valid_until
-                FROM users
-                WHERE lower(email)=%s
-                """,
-                (email,),
-            )
-            user_data = cur.fetchone() or {}
+        if not email or not password:
+            logging.warning("Login failed: missing credentials for %s", email)
+            return jsonify({"success": False, "message": "missing"}), 400
 
-            plan = normalize_plan(user_data.get("plan"))
-            valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                user = find_user_by_email(cur, email)
+                if not user:
+                    return jsonify({"success": False, "message": "not_found"}), 404
+                if not verify_password(password, user.get("password")):
+                    return jsonify({"success": False, "message": "wrong_password"}), 401
 
-            # Only sync with Stripe if necessary (cache miss or no paid plan)
-            if should_sync_stripe_plan(email, plan):
-                reconciled_plan = sync_user_plan_from_stripe(email, plan)
-                if reconciled_plan != plan:
-                    plan = reconciled_plan
-                    valid_until = default_auth_until_ms()
-            else:
-                logging.debug("Skipping Stripe sync (cached), email=%s, plan=%s", email, plan)
+        month = get_month_key()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT plan, valid_until
+                    FROM users
+                    WHERE lower(email)=%s
+                    """,
+                    (email,),
+                )
+                user_data = cur.fetchone() or {}
 
-            cur.execute(
-                """
-                INSERT INTO usage (user_email, month, used, used_ids)
-                VALUES (%s, %s, 0, '[]'::jsonb)
-                ON CONFLICT (user_email, month) DO NOTHING
-                """,
-                (email, month),
-            )
+                plan = normalize_plan(user_data.get("plan"))
+                valid_until = int(user_data.get("valid_until") or default_auth_until_ms())
 
-            cur.execute(
-                """
-                SELECT used, used_ids
-                FROM usage
-                WHERE user_email=%s AND month=%s
-                """,
-                (email, month),
-            )
-            usage = cur.fetchone() or {}
-            used = int(usage.get("used") or 0)
-            used_ids = usage.get("used_ids") or []
-        conn.commit()
+                # Only sync with Stripe if necessary (cache miss or no paid plan)
+                if should_sync_stripe_plan(email, plan):
+                    reconciled_plan = sync_user_plan_from_stripe(email, plan)
+                    if reconciled_plan != plan:
+                        plan = reconciled_plan
+                        valid_until = default_auth_until_ms()
+                else:
+                    logging.debug("Skipping Stripe sync (cached), email=%s, plan=%s", email, plan)
 
-    token = create_jwt_token(email, plan, valid_until)
+                cur.execute(
+                    """
+                    INSERT INTO usage (user_email, month, used, used_ids)
+                    VALUES (%s, %s, 0, '[]'::jsonb)
+                    ON CONFLICT (user_email, month) DO NOTHING
+                    """,
+                    (email, month),
+                )
 
-    response = jsonify(
-        {
-            "success": True,
-            "email": email,
-            "plan": plan,
-            "valid_until": valid_until,
-            # Frontend-Kompatibilität (bestehendes Webflow-Script erwartet auth_until)
-            "auth_until": valid_until,
-            "month": month,
-            "used": used,
-            "used_ids": used_ids,
-            "token": token,
-        }
-    )
+                cur.execute(
+                    """
+                    SELECT used, used_ids
+                    FROM usage
+                    WHERE user_email=%s AND month=%s
+                    """,
+                    (email, month),
+                )
+                usage = cur.fetchone() or {}
+                used = int(usage.get("used") or 0)
+                used_ids = usage.get("used_ids") or []
+            conn.commit()
 
-    session["auth_token"] = token
-    session["email"] = email
-    session["plan"] = plan
-    session["used"] = used
-    session["used_ids"] = used_ids
+        token = create_jwt_token(email, plan, valid_until)
 
-    return response
+        response = jsonify(
+            {
+                "success": True,
+                "email": email,
+                "plan": plan,
+                "valid_until": valid_until,
+                # Frontend-Kompatibilität (bestehendes Webflow-Script erwartet auth_until)
+                "auth_until": valid_until,
+                "month": month,
+                "used": used,
+                "used_ids": used_ids,
+                "token": token,
+            }
+        )
+
+        session["auth_token"] = token
+        session["email"] = email
+        session["plan"] = plan
+        session["used"] = used
+        session["used_ids"] = used_ids
+
+        logging.info("Login successful for %s, plan: %s", email, plan)
+        return response
+
+    except Exception as exc:
+        logging.error("Login error for %s: %s", email, exc, exc_info=True)
+        return jsonify({"success": False, "message": "internal_error"}), 500
 
 
 # ---------------------------- LOGOUT ----------------------------
