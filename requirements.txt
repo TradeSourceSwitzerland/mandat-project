@@ -5,4 +5,3 @@ psycopg[binary]
 bcrypt
 stripe
 pyjwt
-Flask-Limiter==3.5.0
