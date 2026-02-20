@@ -12,6 +12,7 @@ from email.mime.application import MIMEApplication
 
 # ZEVIX Route laden
 from routes.zevix import zevix_bp
+from api.roi_calculator import roi_bp, create_limiter
 
 logging.basicConfig(level=logging.INFO)
 
@@ -36,6 +37,10 @@ app.config.update(
 
 # ZEVIX Blueprint registrieren
 app.register_blueprint(zevix_bp)
+
+# ROI Calculator Blueprint registrieren
+app.register_blueprint(roi_bp)
+create_limiter(app)
 
 
 @app.before_request
