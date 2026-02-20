@@ -5,8 +5,6 @@ import logging
 import smtplib
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -14,7 +12,6 @@ from email.mime.application import MIMEApplication
 
 # ZEVIX Route laden
 from routes.zevix import zevix_bp
-from api.roi_calculator import roi_bp
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,31 +34,13 @@ app.config.update(
     SESSION_COOKIE_DOMAIN=None
 )
 
-# Rate Limiting
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["100 per 15 minutes"]
-)
-
 # ZEVIX Blueprint registrieren
 app.register_blueprint(zevix_bp)
-
-# ROI Calculator Blueprint registrieren
-app.register_blueprint(roi_bp)
 
 
 @app.before_request
 def log_request():
     logging.info("Incoming request: %s %s from %s", request.method, request.path, request.remote_addr)
-
-
-@app.after_request
-def add_security_headers(response):
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    return response
 
 
 @app.route("/zevix/login", methods=["OPTIONS"])
