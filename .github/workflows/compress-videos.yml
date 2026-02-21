@@ -1,0 +1,80 @@
+name: Compress Videos
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.mp4'
+      - '*.mov'
+
+jobs:
+  compress:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Compress Cinematic Video
+        run: |
+          if [ -f "Cinematic Video.mp4" ]; then
+            echo "Compressing Cinematic Video.mp4..."
+            ffmpeg -i "Cinematic Video.mp4" \
+              -c:v libx265 \
+              -crf 28 \
+              -preset medium \
+              -tag:v hvc1 \
+              -c:a aac \
+              -b:a 128k \
+              -movflags +faststart \
+              "Cinematic-Video-compressed.mp4"
+
+            mv "Cinematic-Video-compressed.mp4" "Cinematic Video.mp4"
+            echo "✅ Cinematic Video compressed!"
+          fi
+
+      - name: Compress Demo Video
+        run: |
+          if [ -f "Demo Video.mov" ]; then
+            echo "Compressing Demo Video.mov..."
+            ffmpeg -i "Demo Video.mov" \
+              -c:v libx264 \
+              -crf 26 \
+              -preset medium \
+              -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
+              -c:a aac \
+              -b:a 96k \
+              -movflags +faststart \
+              "Demo-Video-compressed.mp4"
+
+            mv "Demo-Video-compressed.mp4" "Demo Video.mov"
+            echo "✅ Demo Video compressed!"
+          fi
+
+      - name: Check file sizes
+        run: |
+          echo "📊 New file sizes:"
+          ls -lh "Cinematic Video.mp4" 2>/dev/null || echo "Cinematic Video not found"
+          ls -lh "Demo Video.mov" 2>/dev/null || echo "Demo Video not found"
+
+      - name: Commit compressed videos
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add "Cinematic Video.mp4" "Demo Video.mov" || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "🎬 Compress videos for performance optimisation"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
