@@ -39,3 +39,9 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Videos (hosted on CDN)
+*.mp4
+*.mov
+*.avi
+*.mkv
