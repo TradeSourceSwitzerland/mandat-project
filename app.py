@@ -1,66 +1,68 @@
-# app.py
-
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-import logging
-from your_blueprint import zevix_blueprint
 
-# Flask configuration
 app = Flask(__name__)
 CORS(app)
 
-# Logging configuration
-logging.basicConfig(level=logging.INFO)
-
-# Register ZEVIX blueprint
+# ZEVIX Blueprint
+from zevix import zevix_blueprint
 app.register_blueprint(zevix_blueprint)
 
-# Health check routes
-@app.route('/', methods=['GET'])
+# Health Check Routes
+@app.route('/')
 def health_check():
     return 'Service is up!'
 
-@app.route('/healthz', methods=['GET'])
+@app.route('/healthz')
 def health_check_z():
-    return jsonify(status='healthy'), 200
+    return jsonify({'status': 'healthy'})
 
-# Email configuration
-MAIL_SERVER = 'smtp.yourserver.com'
-MAIL_PORT = 587
-MAIL_USE_TLS = True
-MAIL_USERNAME = 'your_email@yourserver.com'
-MAIL_PASSWORD = 'your_password'
+# Email Configuration
+import smtplib
+from email.mime.text import MIMEText
 
-# HTML routes
-@app.route('/mandat', methods=['GET'])
+def send_email(to_address, subject, message):
+    msg = MIMEText(message)
+    msg['Subject'] = subject
+    msg['From'] = 'your-email@example.com'
+    msg['To'] = to_address
+
+    with smtplib.SMTP('smtp.example.com') as server:
+        server.login('your-email@example.com', 'your-password')
+        server.send_message(msg)
+
+# HTML Template Routes
+@app.route('/mandat')
 def mandat():
     return render_template('mandat.html')
 
-@app.route('/login', methods=['GET'])
+@app.route('/login')
 def login():
     return render_template('login.html')
 
-@app.route('/dashboard', methods=['GET'])
+@app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
 
-@app.route('/leads', methods=['GET'])
+@app.route('/leads')
 def leads():
     return render_template('leads.html')
 
-# Email sending logic
+# /api/sendmail Endpoint
 @app.route('/api/sendmail', methods=['POST'])
-def send_email():
+def send_mail():
     data = request.json
-    # Implement email sending logic here
-    # Admin and customer confirmation emails
-    return jsonify({'message': 'Emails sent successfully!'}), 200
+    to_address = data['to_address']
+    subject = data['subject']
+    message = data['message']
+    send_email(to_address, subject, message)
+    return jsonify({'status': 'email sent'})
 
-# Static file serving route
-@app.route('/static/<path:path>', methods=['GET'])
+# Static Files Serving
+@app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
 
-# Main entry point
+# Main Entry Point
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
