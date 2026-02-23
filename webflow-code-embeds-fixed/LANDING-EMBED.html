@@ -3,79 +3,77 @@
      All HTML Sections + JavaScript
      ============================================================ -->
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 1: HERO
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 1: HERO -->
 <section id="hero-section">
 
-  <!-- Cinematic Video Overlay -->
   <div id="hero-video-overlay" style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
     <video id="hero-video" autoplay muted loop playsinline preload="none"
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.2s ease">
       <source src="https://github.com/TradeSourceSwitzerland/mandat-project/raw/main/Cinematic%20Video.mp4" type="video/mp4">
     </video>
-    <div id="text-overlay" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:16px;font-family:'Manolo Mono','Courier New',monospace;color:rgba(212,175,55,0.7);letter-spacing:0.15em;white-space:nowrap;z-index:2;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,0.8)">
-      ZEVIX.CH &nbsp;·&nbsp; KI-LEADGENERIERUNG
+    <div id="text-overlay" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:16px;font-family:'Manolo Mono','Courier New',monospace;color:rgba(212,175,55,0.7);letter-spacing:0.15em;white-space:nowrap;z-index:2;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,0.8);transition:opacity 0.5s ease">
+      ZEVIX.CH &nbsp;&middot;&nbsp; KI-LEADGENERIERUNG
     </div>
+  </div>
+
+  <div id="logo-reveal-overlay" style="position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none">
+    <img id="hero-logo-big"
+      src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69910f36b5cc8cb549bfd15f_Zefix%20Final.png"
+      alt="Zevix"
+      style="height:100px;transform:scale(1);opacity:1;transition:transform 1s cubic-bezier(.16,1,.3,1),opacity 0.8s ease;filter:drop-shadow(0 4px 24px rgba(212,175,55,0.5))">
   </div>
 
   <div class="container" style="position:relative;z-index:2">
 
-    <!-- Logo -->
-    <div style="margin-bottom:32px;animation:fadeIn 0.6s ease">
-      <img id="hero-logo" src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69910f36b5cc8cb549bfd15f_Zefix%20Final.png"
-        alt="Zevix" style="height:56px;transition:transform .6s ease">
+    <div id="hero-logo-small" style="margin-bottom:32px;animation:fadeIn 0.6s ease 1.8s both">
+      <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69910f36b5cc8cb549bfd15f_Zefix%20Final.png" alt="Zevix" style="height:52px">
     </div>
 
-    <!-- Headline -->
     <h1 id="typing-headline" style="font-size:52px;font-weight:900;line-height:1.1;margin:0 auto 24px;max-width:820px;min-height:180px;font-family:'Manolo Mono','Courier New',monospace;color:#F4D03F;letter-spacing:-0.01em">
-      <span id="typed-text"></span><span id="cursor" style="animation:blink 1s step-end infinite">|</span>
+      <span id="typed-text"></span><span id="cursor" style="display:none;animation:blink 1s step-end infinite">|</span>
     </h1>
 
-    <p style="font-size:20px;color:rgba(255,255,255,0.75);max-width:600px;margin:0 auto 40px;line-height:1.6">
-      Zevix findet täglich neue Schweizer Firmenkontakte – vollautomatisch, KI-gestützt, direkt exportierbar.
+    <p style="font-size:22px;font-weight:700;color:#fff;max-width:620px;margin:0 auto 12px;line-height:1.5">
+      Bis zu 4’500 tagesaktuelle Firmen-Leads pro Monat.
+    </p>
+    <p style="font-size:16px;color:rgba(255,255,255,0.65);max-width:500px;margin:0 auto 40px;letter-spacing:0.05em">
+      Automatisiert. Präzise. DSG-konform.
     </p>
 
-    <div class="cta-wrapper" style="margin-bottom:60px">
-      <a href="https://www.zevix.ch/preise" class="cta-btn">
-        🚀 Jetzt kostenlos starten
-      </a>
+    <div class="cta-wrapper" style="margin-bottom:20px">
+      <a href="https://www.zevix.ch/preise" class="cta-btn">Jetzt starten</a>
     </div>
+    <p style="color:rgba(255,255,255,0.4);font-size:13px;margin:0 0 48px">Bereits von über 500 Schweizer Firmen genutzt</p>
 
-    <!-- Stats Grid -->
     <div class="stats-grid">
       <div style="text-align:center">
-        <div class="gradient-text" style="font-size:48px;line-height:1">250'000+</div>
-        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">Schweizer Firmen</div>
+        <div class="gradient-text" style="font-size:48px;line-height:1">4500+</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">Leads pro Monat</div>
       </div>
       <div style="text-align:center">
-        <div class="gradient-text" style="font-size:48px;line-height:1">98%</div>
-        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">Datenqualität</div>
+        <div class="gradient-text" style="font-size:48px;line-height:1">100%</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">Tagesaktuelle Daten</div>
       </div>
       <div style="text-align:center">
-        <div class="gradient-text" style="font-size:48px;line-height:1">5 Min</div>
-        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">Setup-Zeit</div>
+        <div class="gradient-text" style="font-size:48px;line-height:1">DSG</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:14px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase">100% Konform</div>
       </div>
     </div>
 
-    <!-- Spots Counter -->
     <div style="margin-top:40px;padding:16px 32px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:10px;display:inline-block">
-      <span style="color:rgba(255,255,255,0.7);font-size:14px">🔥 Nur noch </span>
-      <span id="spots-count" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">—</span>
+      <span style="color:rgba(255,255,255,0.7);font-size:14px">Nur noch </span>
+      <span id="spots-count" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">&mdash;</span>
       <span style="color:rgba(255,255,255,0.7);font-size:14px"> freie Plätze heute</span>
     </div>
 
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 2: LIVE DEMO
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 2: LIVE DEMO -->
 <section class="section" id="demo-section" style="background:#0a0a0a">
   <div class="container">
     <div class="demo-grid">
 
-      <!-- iPhone Mockup -->
       <div style="display:flex;justify-content:center;order:2">
         <div class="iphone-mockup floating">
           <div class="iphone-notch"></div>
@@ -88,15 +86,14 @@
         </div>
       </div>
 
-      <!-- Text Content -->
       <div style="order:1">
         <div class="live-demo-badge" id="live-demo-badge">
-          <span style="color:#10B981;margin-right:8px">●</span>
+          <span style="color:#10B981;margin-right:8px">&#9679;</span>
           <span style="color:rgba(255,255,255,0.8);font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase">Live Demo</span>
         </div>
 
         <h2 style="font-size:42px;font-weight:900;line-height:1.15;margin:0 0 20px;color:#fff">
-          Sieh Zevix in <span class="gradient-text">Aktion</span>
+          Sehen Sie <span class="gradient-text">Zevix</span> in Aktion
         </h2>
 
         <p style="font-size:17px;color:rgba(255,255,255,0.65);line-height:1.7;margin-bottom:28px">
@@ -105,27 +102,21 @@
 
         <ul style="list-style:none;padding:0;margin:0 0 32px;display:flex;flex-direction:column;gap:14px">
           <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">Echtzeit-Daten aus dem Handelsregister & Zevix-Datenbank</span>
+            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">&#10003;</span>
+            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">Intelligente Filter nach Branche, Kanton &amp; Rechtsform</span>
           </li>
           <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">Filter nach Branche, Kanton, Grösse, Gründungsjahr</span>
+            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">&#10003;</span>
+            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">One-Click Export &ndash; CSV, Excel direkt ins CRM</span>
           </li>
           <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">CSV/Excel Export mit einem Klick – direkt ins CRM</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">KI-Score: Welche Firma hat gerade Bedarf?</span>
+            <span style="color:#10B981;font-size:20px;flex-shrink:0;margin-top:1px">&#10003;</span>
+            <span style="color:rgba(255,255,255,0.8);font-size:16px;line-height:1.5">Serienbrief-Generator &ndash; PDF-Serienbriefe automatisiert</span>
           </li>
         </ul>
 
         <div class="cta-wrapper" style="text-align:left">
-          <a href="https://www.zevix.ch/preise" class="cta-btn" style="padding:16px 40px;font-size:16px">
-            Kostenlos ausprobieren →
-          </a>
+          <a href="https://www.zevix.ch/preise" class="cta-btn" style="padding:16px 40px;font-size:16px">Jetzt 5 Tage gratis testen</a>
         </div>
       </div>
 
@@ -133,14 +124,12 @@
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 3: FEATURES
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 3: FEATURES -->
 <section class="section" id="features-section" style="background:#000">
   <div class="container">
 
     <div style="text-align:center;margin-bottom:64px">
-      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">Alles was du brauchst</p>
+      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">Alles was Sie brauchen</p>
       <h2 style="font-size:44px;font-weight:900;margin:0 0 16px;color:#fff">Warum <span class="gradient-text">Zevix</span>?</h2>
       <p style="color:rgba(255,255,255,0.55);font-size:18px;max-width:560px;margin:0 auto">Die leistungsstärkste Lead-Plattform für den Schweizer Markt.</p>
     </div>
@@ -148,168 +137,172 @@
     <div class="features-grid">
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">🤖</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">KI-gestützte Suche</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Unsere KI analysiert Millionen von Datenpunkten und findet die relevantesten Leads für dein Business – vollautomatisch.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">Ø 4’500 Leads monatlich</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Exklusive Neueintragungen aus offiziellen Quellen &ndash; täglich frisch, ohne Duplikate.</p>
       </div>
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">🇨🇭</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">Schweiz-Fokus</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">250'000+ Schweizer Firmen in unserer Datenbank. Direkter Zugang zum Handelsregister, tagesaktuelle Updates.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">Präzise Filter</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Alle Branchen, Kantone, Rechtsformen &ndash; finden Sie genau die Unternehmen, die zu Ihnen passen.</p>
       </div>
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">⚡</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">Sofort einsatzbereit</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Setup in 5 Minuten. Keine IT-Kenntnisse nötig. Einfach einloggen, filtern, exportieren – fertig.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">Serienbrief-Generator</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Automatisierte PDF-Serienbriefe &ndash; personalisiert, professionell, skalierbar.</p>
       </div>
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">🎯</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">Präzise Filter</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Branche, Kanton, Mitarbeiterzahl, Gründungsjahr, Umsatz – finde genau die Firmen, die zu dir passen.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">DSG-konform</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">100% Schweizer Datenschutz &ndash; alle Daten aus öffentlichen Quellen, sicher in der Schweiz gehostet.</p>
       </div>
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">📊</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">Export & CRM-Integration</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">CSV, Excel, direkte API – deine Leads gehen nahtlos in HubSpot, Salesforce oder dein eigenes System.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">Täglich aktualisiert</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Keine veralteten Daten &ndash; Zevix synchronisiert täglich mit dem Handelsregister.</p>
       </div>
 
       <div class="feature-card">
-        <div style="font-size:36px;margin-bottom:20px">🔒</div>
-        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#fff">DSGVO-konform</h3>
-        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Alle Daten aus öffentlichen Quellen, DSGVO- und DSG-konform. Sicher in der Schweiz gehostet.</p>
+        <h3 style="font-size:22px;font-weight:700;margin:0 0 12px;color:#F4D03F;font-family:'Manolo Mono',monospace">API-Zugang</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.65;margin:0">Qualifizierte Leads sofort nutzen &ndash; direkte Integration in HubSpot, Salesforce oder Ihr eigenes System.</p>
       </div>
 
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 4: WORKFLOW
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 4: WORKFLOW -->
 <section class="section" id="workflow-section" style="background:#0a0a0a">
   <div class="container">
 
     <div style="text-align:center;margin-bottom:64px">
-      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">So einfach geht's</p>
-      <h2 style="font-size:44px;font-weight:900;margin:0 0 16px;color:#fff">Dein <span class="gradient-text">Workflow</span> mit Zevix</h2>
-      <p style="color:rgba(255,255,255,0.55);font-size:18px;max-width:560px;margin:0 auto">Von der Suche bis zum versendeten Angebot – in einem einzigen Flow.</p>
+      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">Der Zevix-Prozess</p>
+      <h2 style="font-size:44px;font-weight:900;margin:0 0 16px;color:#fff">Von Leads zu Kunden.<br><span class="gradient-text">In 4 Schritten.</span></h2>
     </div>
 
-    <!-- Main Workflow Steps -->
-    <div class="workflow-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-bottom:32px">
+    <!-- Leads + AI (2-col) -->
+    <div class="workflow-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:24px">
 
       <div class="wf-card" style="background:linear-gradient(135deg,rgba(212,175,55,0.06),rgba(10,10,10,0.9));border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:32px" onclick="toggleWfDetail(this)">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🔍</div>
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
           <div>
-            <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 1</div>
-            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Leads finden</h3>
+            <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 1a</div>
+            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Leads</h3>
           </div>
         </div>
-        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Branche und Region wählen – Zevix liefert sofort passende Kontakte.</p>
+        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">4’500+ monatlich &ndash; tagesaktuelle Neueintragungen aus dem Handelsregister.</p>
         <div class="wf-detail">
           <ul style="margin:0;padding-left:20px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.8">
-            <li>250'000+ Schweizer Firmendaten</li>
-            <li>Filter: Branche, Kanton, Grösse, Gründungsjahr</li>
-            <li>Echtzeit-Daten aus dem Handelsregister</li>
-            <li>KI-Score für Kaufbereitschaft</li>
+            <li>Täglich neue Unternehmen direkt aus dem Handelsregister</li>
+            <li>Keine Duplikate, keine veralteten Daten</li>
+            <li>Exklusive Neueintragungen vor dem Wettbewerb</li>
           </ul>
         </div>
       </div>
 
       <div class="wf-card" style="background:linear-gradient(135deg,rgba(212,175,55,0.06),rgba(10,10,10,0.9));border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:32px" onclick="toggleWfDetail(this)">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🤖</div>
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+            <span style="color:#000;font-weight:900;font-size:14px;letter-spacing:-0.05em;font-family:'Manolo Mono',monospace">AI</span>
+            <span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#10B981;border-radius:50%;animation:pulse 2s ease-in-out infinite"></span>
+          </div>
+          <div>
+            <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 1b</div>
+            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">AI</h3>
+          </div>
+        </div>
+        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Intelligente Verarbeitung &ndash; KI analysiert und priorisiert Ihre besten Leads.</p>
+        <div class="wf-detail">
+          <ul style="margin:0;padding-left:20px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.8">
+            <li>Intelligente Analyse von Branche, Grösse und Aktivität</li>
+            <li>Priorisiert die relevantesten Leads für Sie</li>
+            <li>Kontinuierlich lernend und verbessernd</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;padding:20px 0"><div style="display:inline-block;width:2px;height:32px;background:linear-gradient(180deg,rgba(212,175,55,0.5),rgba(212,175,55,0.1))"></div><div style="color:rgba(212,175,55,0.3);font-size:20px;line-height:1">&#8964;</div></div>
+
+    <!-- Filtern -->
+    <div style="max-width:600px;margin:0 auto">
+      <div class="wf-card" style="background:linear-gradient(135deg,rgba(212,175,55,0.06),rgba(10,10,10,0.9));border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:32px" onclick="toggleWfDetail(this)">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
           <div>
             <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 2</div>
-            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">KI analysiert</h3>
+            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Filtern</h3>
           </div>
         </div>
-        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Die KI bewertet jede Firma: Wer hat gerade echten Bedarf?</p>
+        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Nach Branche, Kanton &amp; Rechtsform &ndash; finden Sie exakt die richtigen Unternehmen.</p>
         <div class="wf-detail">
           <ul style="margin:0;padding-left:20px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.8">
-            <li>Analyse von Wachstumssignalen</li>
-            <li>Jobinserate als Bedarfsindikator</li>
-            <li>Branchentrends & Saisonalität</li>
-            <li>Relevanz-Score 0–100</li>
+            <li>Branche, Kanton, Rechtsform, Gründungsjahr</li>
+            <li>Mehrfach-Filter kombinierbar</li>
+            <li>Gespeicherte Filter für wiederkehrende Suchen</li>
           </ul>
         </div>
       </div>
+    </div>
 
+    <div style="text-align:center;padding:20px 0"><div style="display:inline-block;width:2px;height:32px;background:linear-gradient(180deg,rgba(212,175,55,0.5),rgba(212,175,55,0.1))"></div><div style="color:rgba(212,175,55,0.3);font-size:20px;line-height:1">&#8964;</div></div>
+
+    <!-- Export oder Serienbrief -->
+    <div style="max-width:600px;margin:0 auto">
       <div class="wf-card" style="background:linear-gradient(135deg,rgba(212,175,55,0.06),rgba(10,10,10,0.9));border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:32px" onclick="toggleWfDetail(this)">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🎯</div>
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
           <div>
             <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 3</div>
-            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Filtern & priorisieren</h3>
+            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Export oder Serienbrief</h3>
           </div>
         </div>
-        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Nur die besten Leads behalten. Mit einem Klick aussortieren.</p>
+        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">Excel, CSV oder PDF &ndash; einer oder tausende Empfänger auf Knopfdruck.</p>
         <div class="wf-detail">
           <ul style="margin:0;padding-left:20px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.8">
-            <li>Leads bewerten & markieren</li>
-            <li>Blacklist für bereits kontaktierte Firmen</li>
-            <li>Team-Sharing & Zuweisungen</li>
-            <li>Speichern als Ziel-Liste</li>
+            <li>Excel &amp; CSV Download mit einem Klick</li>
+            <li>Personalisierte PDF-Serienbriefe automatisiert</li>
+            <li>Direkte CRM-Integration (HubSpot, Salesforce)</li>
           </ul>
         </div>
       </div>
-
-      <div class="wf-card" style="background:linear-gradient(135deg,rgba(212,175,55,0.06),rgba(10,10,10,0.9));border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:32px" onclick="toggleWfDetail(this)">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📤</div>
-          <div>
-            <div style="color:rgba(212,175,55,0.6);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Schritt 4</div>
-            <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0">Exportieren</h3>
-          </div>
-        </div>
-        <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0">CSV, Excel oder direkt ins CRM – deine Leads, dein Format.</p>
-        <div class="wf-detail">
-          <ul style="margin:0;padding-left:20px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.8">
-            <li>CSV & Excel Download</li>
-            <li>HubSpot, Salesforce, Pipedrive</li>
-            <li>REST API für eigene Systeme</li>
-            <li>Automatischer täglicher Export</li>
-          </ul>
-        </div>
-      </div>
-
     </div>
 
-    <!-- Send Step -->
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="display:inline-block;width:2px;height:32px;background:linear-gradient(180deg,rgba(212,175,55,0.5),rgba(212,175,55,0.1))"></div>
-      <div style="color:rgba(212,175,55,0.6);font-size:13px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin:8px 0">Und dann versenden via</div>
-    </div>
+    <div style="text-align:center;padding:20px 0"><div style="display:inline-block;width:2px;height:32px;background:linear-gradient(180deg,rgba(212,175,55,0.5),rgba(212,175,55,0.1))"></div><div style="color:rgba(212,175,55,0.3);font-size:20px;line-height:1">&#8964;</div></div>
 
+    <!-- Versenden -->
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase">Schritt 4 &ndash; Versenden via</div>
+    </div>
     <div class="workflow-send-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
 
-      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">📧</div>
-        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">E-Mail</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px">Direkt aus Outlook / Gmail</div>
+      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center" onclick="toggleWfDetail(this)">
+        <div style="width:40px;height:40px;background:rgba(212,175,55,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">Post</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:12px">Physische Briefe</div>
+        <div class="wf-detail"><p style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;line-height:1.6">Physische Briefe per Post &ndash; hohe Öffnungsrate, professioneller Eindruck.</p></div>
       </div>
 
-      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">💼</div>
-        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">LinkedIn</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px">Direkt zum Profil</div>
+      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center" onclick="toggleWfDetail(this)">
+        <div style="width:40px;height:40px;background:rgba(212,175,55,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">Mail</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:12px">E-Mail Kampagnen</div>
+        <div class="wf-detail"><p style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;line-height:1.6">Digitale Kommunikation per E-Mail &ndash; schnell, günstig, messbar.</p></div>
       </div>
 
-      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">📱</div>
-        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">WhatsApp / SMS</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px">Persönliche Ansprache</div>
+      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center" onclick="toggleWfDetail(this)">
+        <div style="width:40px;height:40px;background:rgba(212,175,55,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">SMS</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:12px">Direkte Nachrichten</div>
+        <div class="wf-detail"><p style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;line-height:1.6">Direkte Kurznachrichten &ndash; höchste Leserate aller Kanäle.</p></div>
       </div>
 
-      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">📞</div>
-        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">Telefon</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px">Direkt anrufen</div>
+      <div class="wf-small" style="background:rgba(255,255,255,0.03);border:1px solid rgba(212,175,55,0.1);border-radius:12px;padding:20px 16px;text-align:center" onclick="toggleWfDetail(this)">
+        <div style="width:40px;height:40px;background:rgba(212,175,55,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><span style="color:rgba(212,175,55,0.9);font-weight:900;font-size:14px;font-family:'Manolo Mono',monospace;letter-spacing:-0.05em">eP</span></div>
+        <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:4px">ePost App</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:12px">Digitaler Briefkasten</div>
+        <div class="wf-detail"><p style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;line-height:1.6">Digitaler Briefkasten &ndash; der moderne Weg für offizielle Korrespondenz.</p></div>
       </div>
 
     </div>
@@ -317,75 +310,102 @@
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 5: TRUST (Logo Ticker + Testimonials)
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 5: PROBLEM / SOLUTION -->
+<section class="section" id="sunset-section" style="position:relative;overflow:hidden;padding:100px 0">
+
+  <div id="sunset-bg" style="position:absolute;inset:0;background:url('https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69977a3f5b99bc701fc41fd4_sun-setting-over-ocean.jpg?w=1200&q=60') center/cover no-repeat;background-attachment:fixed;z-index:0"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,0.75),rgba(0,0,0,0.65) 50%,rgba(0,0,0,0.75));z-index:1"></div>
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45);z-index:2"></div>
+
+  <div class="container" style="position:relative;z-index:3">
+
+    <div style="text-align:center;margin-bottom:64px">
+      <p style="color:rgba(212,175,55,0.85);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Warum Zevix?</p>
+      <h2 style="font-size:44px;font-weight:900;margin:0;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Der Unterschied, <span class="gradient-text" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.9))">der zählt.</span></h2>
+    </div>
+
+    <div class="problem-solution-grid">
+
+      <div style="background:rgba(0,0,0,0.6);border:1px solid rgba(239,68,68,0.25);border-radius:20px;padding:40px 32px">
+        <div style="display:inline-block;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 16px;margin-bottom:20px">
+          <span style="color:#EF4444;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Das Problem</span>
+        </div>
+        <h3 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 28px;line-height:1.3;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Kopfschmerzen bei der Lead-Suche?</h3>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:16px">
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10007;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Stundenlange manuelle Recherche im Internet</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10007;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Veraltete Kontaktdaten aus Excel-Listen</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10007;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Kein System für Neukunden-Akquise</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10007;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Verpassen von Neugründungen und Neueintragungen</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10007;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">DSG-Compliance unklar &ndash; rechtliche Unsicherheit</span>
+          </li>
+        </ul>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.6);border:1px solid rgba(212,175,55,0.3);border-radius:20px;padding:40px 32px">
+        <div style="display:inline-block;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.3);border-radius:8px;padding:6px 16px;margin-bottom:20px">
+          <span style="color:#F4D03F;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Die Lösung</span>
+        </div>
+        <h3 style="font-size:26px;font-weight:800;margin:0 0 28px;line-height:1.3"><span class="gradient-text" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.9))">Neue Chancen. Automatisch.</span></h3>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:16px">
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10003;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Täglich aktualisierte Firmen-Daten automatisch</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10003;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Vollautomatische Lead-Generierung in 5 Minuten</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10003;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Strukturierter Lead-Workflow bis zum Abschluss</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10003;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Bis zu 4’500 Neueintragungen täglich verfügbar</span>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:12px">
+            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:2px;font-weight:700">&#10003;</span>
+            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">100% DSG-konform &ndash; sichere Schweizer Datenbasis</span>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="cta-wrapper" style="margin-top:56px">
+      <a href="https://www.zevix.ch/preise" class="cta-btn">Jetzt loslegen &#8594;</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- SECTION 6: TRUST (Logo Ticker + Testimonials) -->
 <section class="section" id="trust-section" style="background:#000">
   <div class="container">
 
-    <div style="text-align:center;margin-bottom:48px">
-      <p style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 8px">Vertraut von Teams bei</p>
-      <p style="color:rgba(255,255,255,0.25);font-size:13px;margin:0">Unternehmen dieser Grösse nutzen ähnliche Tools wie Zevix</p>
+    <div style="text-align:center;margin-bottom:32px">
+      <p style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0">Vertraut von führenden Schweizer Unternehmen</p>
     </div>
 
-    <!-- Logo Ticker -->
     <div id="logo-container" style="overflow:hidden;position:relative;padding:28px 0;mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)">
-      <div id="logo-ticker" style="display:flex;width:max-content">
-        <!-- Track 1 -->
-        <div class="logo-track" id="logo-track-1">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4cba1fc6a6ae7bde_pwc.png" alt="PwC" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4efc6c5c83e9e39617_deloitte.png" alt="Deloitte" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2d7b1a3c7d8e9f1a_kpmg.png" alt="KPMG" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1b2c3d4e5f6a7b8c_ey.png" alt="EY" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e9a8b7c6d5e4f3a2b_adecco.png" alt="Adecco" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e3c2b1a0f9e8d7c6b_manpower.png" alt="Manpower" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e5d6e7f8a9b0c1d2e_randstad.png" alt="Randstad" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e0a1b2c3d4e5f6a7b_accenture.png" alt="Accenture" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e8f9a0b1c2d3e4f5a_bdo.png" alt="BDO" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e7e8f9a0b1c2d3e4f_swisscom.png" alt="Swisscom" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e6d7e8f9a0b1c2d3e_ubs.png" alt="UBS" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4c5d6e7f8a9b0c1d_zurich.png" alt="Zurich" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2a3b4c5d6e7f8a9b_axa.png" alt="AXA" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1f2a3b4c5d6e7f8a_helvetia.png" alt="Helvetia" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8);transition:opacity .3s">
-        </div>
-        <!-- Track 2 (duplicate for seamless loop) -->
-        <div class="logo-track" id="logo-track-2" aria-hidden="true">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4cba1fc6a6ae7bde_pwc.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4efc6c5c83e9e39617_deloitte.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2d7b1a3c7d8e9f1a_kpmg.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1b2c3d4e5f6a7b8c_ey.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e9a8b7c6d5e4f3a2b_adecco.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e3c2b1a0f9e8d7c6b_manpower.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e5d6e7f8a9b0c1d2e_randstad.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e0a1b2c3d4e5f6a7b_accenture.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e8f9a0b1c2d3e4f5a_bdo.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e7e8f9a0b1c2d3e4f_swisscom.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e6d7e8f9a0b1c2d3e_ubs.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4c5d6e7f8a9b0c1d_zurich.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2a3b4c5d6e7f8a9b_axa.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1f2a3b4c5d6e7f8a_helvetia.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-        </div>
-        <!-- Track 3 (third duplicate for extra-smooth loop) -->
-        <div class="logo-track" id="logo-track-3" aria-hidden="true">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4cba1fc6a6ae7bde_pwc.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4efc6c5c83e9e39617_deloitte.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2d7b1a3c7d8e9f1a_kpmg.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1b2c3d4e5f6a7b8c_ey.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e9a8b7c6d5e4f3a2b_adecco.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e3c2b1a0f9e8d7c6b_manpower.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e5d6e7f8a9b0c1d2e_randstad.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e0a1b2c3d4e5f6a7b_accenture.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e8f9a0b1c2d3e4f5a_bdo.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e7e8f9a0b1c2d3e4f_swisscom.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e6d7e8f9a0b1c2d3e_ubs.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e4c5d6e7f8a9b0c1d_zurich.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e2a3b4c5d6e7f8a9b_axa.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-          <img src="https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699b3e4e1f2a3b4c5d6e7f8a_helvetia.png" alt="" style="height:36px;opacity:0.55;filter:grayscale(100%) brightness(1.8)">
-        </div>
+      <div id="logo-ticker" class="logo-track" style="display:flex;width:max-content;gap:70px;align-items:center;will-change:transform">
       </div>
     </div>
 
-    <!-- Testimonials -->
     <div style="margin-top:80px;text-align:center;margin-bottom:48px">
       <h2 style="font-size:38px;font-weight:900;margin:0 0 8px;color:#fff">Was unsere <span class="gradient-text">Kunden</span> sagen</h2>
     </div>
@@ -394,31 +414,27 @@
 
       <div class="testimonial-card">
         <div style="display:flex;gap:4px;margin-bottom:16px">
-          <span style="color:#F4D03F;font-size:18px">★★★★★</span>
+          <span style="color:#F4D03F;font-size:18px">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
         </div>
-        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">
-          "Zevix hat unsere Kaltakquise komplett verändert. Wir finden jetzt in 10 Minuten mehr qualifizierte Leads als früher in einem ganzen Arbeitstag."
-        </p>
+        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">„Dank Zevix haben wir unseren Kundenstamm innerhalb von 3 Monaten um 40% erweitert. Die Qualität der Leads ist beeindruckend.“</p>
         <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px">M</div>
+          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px;flex-shrink:0">M</div>
           <div>
-            <div style="color:#fff;font-weight:600;font-size:14px">Marco Brunner</div>
-            <div style="color:rgba(255,255,255,0.45);font-size:12px">Vertriebsleiter, Zürich</div>
+            <div style="color:#fff;font-weight:600;font-size:14px">Michael R.</div>
+            <div style="color:rgba(255,255,255,0.45);font-size:12px">Sales Director, Zürich</div>
           </div>
         </div>
       </div>
 
       <div class="testimonial-card">
         <div style="display:flex;gap:4px;margin-bottom:16px">
-          <span style="color:#F4D03F;font-size:18px">★★★★★</span>
+          <span style="color:#F4D03F;font-size:18px">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
         </div>
-        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">
-          "Die Datenqualität ist beeindruckend. Keine veralteten Einträge mehr, keine falschen Telefonnummern. Direkt einsatzbereit für unser CRM."
-        </p>
+        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">„Der ROI ist unglaublich. Was früher Stunden an manueller Arbeit kostete, erledigt Zevix in Minuten – vollautomatisch.“</p>
         <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px">S</div>
+          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px;flex-shrink:0">S</div>
           <div>
-            <div style="color:#fff;font-weight:600;font-size:14px">Sandra Meier</div>
+            <div style="color:#fff;font-weight:600;font-size:14px">Sarah K.</div>
             <div style="color:rgba(255,255,255,0.45);font-size:12px">CEO, Basel</div>
           </div>
         </div>
@@ -426,16 +442,14 @@
 
       <div class="testimonial-card">
         <div style="display:flex;gap:4px;margin-bottom:16px">
-          <span style="color:#F4D03F;font-size:18px">★★★★★</span>
+          <span style="color:#F4D03F;font-size:18px">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
         </div>
-        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">
-          "Der ROI war bereits nach der ersten Woche positiv. Wir haben 3 neue Kunden gewonnen, die wir ohne Zevix nie gefunden hätten. Klare Empfehlung."
-        </p>
+        <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.7;margin:0 0 20px;font-style:italic">„Die DSG-Konformität war für uns entscheidend. Zevix liefert qualitativ hochwertige Leads komplett rechtskonform.“</p>
         <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px">T</div>
+          <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:16px;flex-shrink:0">T</div>
           <div>
-            <div style="color:#fff;font-weight:600;font-size:14px">Thomas Weber</div>
-            <div style="color:rgba(255,255,255,0.45);font-size:12px">Geschäftsführer, Bern</div>
+            <div style="color:#fff;font-weight:600;font-size:14px">Thomas M.</div>
+            <div style="color:rgba(255,255,255,0.45);font-size:12px">Partner, Bern</div>
           </div>
         </div>
       </div>
@@ -444,388 +458,270 @@
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 6: PROBLEM / SOLUTION
-     ═══════════════════════════════════════════════ -->
-<section class="section" id="sunset-section" style="position:relative;overflow:hidden;padding:100px 0">
-
-  <!-- Sunset Background -->
-  <div id="sunset-bg" style="position:absolute;inset:0;background:url('https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69977a3f5b99bc701fc41fd4_sun-setting-over-ocean.jpg?w=1200&q=60') center/cover no-repeat;background-attachment:fixed;opacity:0.7;z-index:0"></div>
-  <!-- Dark overlay for readability -->
-  <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,0.75),rgba(0,0,0,0.65) 50%,rgba(0,0,0,0.75));z-index:1"></div>
-  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45);z-index:2"></div>
-
-  <div class="container" style="position:relative;z-index:3">
-
-    <div style="text-align:center;margin-bottom:64px">
-      <p style="color:rgba(212,175,55,0.85);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Der Unterschied</p>
-      <h2 style="font-size:44px;font-weight:900;margin:0;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.9)">
-        Alte Methoden vs. <span class="gradient-text" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.9))">Automatisch.</span>
-      </h2>
-    </div>
-
-    <div class="problem-solution-grid">
-
-      <!-- Problem Column -->
-      <div style="background:rgba(0,0,0,0.6);border:1px solid rgba(239,68,68,0.25);border-radius:20px;padding:40px 32px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
-          <div style="width:40px;height:40px;background:rgba(239,68,68,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px">❌</div>
-          <h3 style="color:#EF4444;font-size:22px;font-weight:700;margin:0;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Ohne Zevix</h3>
-        </div>
-        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:16px">
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Stundenlange manuelle Recherche im Internet</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Veraltete Daten aus dem Handelsregister-PDF</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Kein Filter – alle Branchen, keine Priorisierung</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Teures LinkedIn Sales Navigator für CHF 99+/Monat</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Manueller Copy-Paste in Excel – fehleranfällig</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#EF4444;font-size:18px;flex-shrink:0;margin-top:1px">✗</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">5–10 Leads pro Tag bei vollem Einsatz</span>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Solution Column -->
-      <div style="background:rgba(0,0,0,0.6);border:1px solid rgba(212,175,55,0.3);border-radius:20px;padding:40px 32px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
-          <div style="width:40px;height:40px;background:rgba(212,175,55,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px">✅</div>
-          <h3 style="color:#F4D03F;font-size:22px;font-weight:700;margin:0;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Mit Zevix</h3>
-        </div>
-        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:16px">
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Automatisch: 100+ Leads täglich in 5 Minuten</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Tagesaktuelle Daten – immer aktuell</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Präzise Filter: Branche, Kanton, Grösse, KI-Score</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Ab CHF 49/Monat – Swiss-made Alternative</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">1-Klick Export: CSV, Excel, CRM-Integration</span>
-          </li>
-          <li style="display:flex;align-items:flex-start;gap:12px">
-            <span style="color:#10B981;font-size:18px;flex-shrink:0;margin-top:1px">✓</span>
-            <span style="color:#fff;font-size:15px;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,0.9)">Skalierbar: 500+ Leads täglich möglich</span>
-          </li>
-        </ul>
-      </div>
-
-    </div>
-
-    <div class="cta-wrapper" style="margin-top:56px">
-      <a href="https://www.zevix.ch/preise" class="cta-btn">
-        🚀 Jetzt wechseln – kostenlos testen
-      </a>
-    </div>
-
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════
-     SECTION 7: ROI CALCULATOR
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 7: ROI CALCULATOR -->
 <section class="section" id="roi-section" style="background:#000">
   <div class="container">
 
     <div style="text-align:center;margin-bottom:56px">
-      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">Dein Return on Investment</p>
-      <h2 style="font-size:44px;font-weight:900;margin:0 0 16px;color:#fff">Was bringt Zevix <span class="gradient-text">dir</span>?</h2>
-      <p style="color:rgba(255,255,255,0.55);font-size:18px;max-width:560px;margin:0 auto">Berechne deinen persönlichen ROI – in weniger als 30 Sekunden.</p>
+      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px">Ihr Return on Investment</p>
+      <h2 style="font-size:44px;font-weight:900;margin:0 0 16px;color:#fff">Was bringt Zevix <span class="gradient-text">Ihnen</span>?</h2>
+      <p style="color:rgba(255,255,255,0.55);font-size:18px;max-width:560px;margin:0 auto">Berechnen Sie Ihren persönlichen ROI &ndash; in weniger als 30 Sekunden.</p>
     </div>
 
     <div id="roi-calculator" style="max-width:800px;margin:0 auto">
 
-      <!-- Results Grid -->
       <div class="roi-results">
         <div>
           <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Neue Kunden/Monat</div>
           <div id="new-customers" style="color:#F4D03F;font-size:clamp(24px,5vw,48px);font-weight:900;font-family:'Manolo Mono',monospace;word-break:break-word;overflow-wrap:break-word;line-height:1.1">0</div>
         </div>
         <div>
-          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Zusatz-Umsatz/Monat</div>
+          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Monatsumsatz (CHF)</div>
           <div id="monthly-revenue" style="color:#10B981;font-size:clamp(16px,3.5vw,32px);font-weight:900;font-family:'Manolo Mono',monospace;word-break:break-word;overflow-wrap:break-word;line-height:1.1">CHF 0</div>
         </div>
         <div>
-          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Zusatz-Umsatz/Jahr</div>
+          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Jahresumsatz (CHF)</div>
           <div id="yearly-revenue" style="color:#10B981;font-size:clamp(16px,3.5vw,32px);font-weight:900;font-family:'Manolo Mono',monospace;word-break:break-word;overflow-wrap:break-word;line-height:1.1">CHF 0</div>
         </div>
         <div>
-          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">ROI</div>
+          <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">ROI %</div>
           <div>
-            <span id="roi" style="color:#F4D03F;font-size:clamp(22px,4.5vw,42px);font-weight:900;font-family:'Manolo Mono',monospace;word-break:break-word;overflow-wrap:break-word;line-height:1.1">0x</span>
-            <span id="plan-name" style="color:rgba(255,255,255,0.4);font-size:9px;display:block;margin-top:2px">vs. Starter Plan</span>
+            <span id="roi" style="color:#F4D03F;font-size:clamp(22px,4.5vw,42px);font-weight:900;font-family:'Manolo Mono',monospace;word-break:break-word;overflow-wrap:break-word;line-height:1.1">0%</span>
+            <span id="plan-name" style="color:rgba(255,255,255,0.4);font-size:9px;display:block;margin-top:2px">Basic &ndash; CHF 69/Mt.</span>
           </div>
         </div>
       </div>
 
-      <!-- Sliders & Input -->
       <div style="display:flex;flex-direction:column;gap:28px">
 
         <div>
           <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:4px">
             <span style="color:rgba(255,255,255,0.8);font-size:15px;font-weight:600">Leads pro Monat</span>
-            <span id="leads-value" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">100</span>
+            <span id="leads-value" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">4’500</span>
           </label>
-          <input type="range" id="leads-slider" min="10" max="1000" value="100" step="10"
-            style="background:linear-gradient(90deg,var(--gold) 9%,#333 9%)"
+          <input type="range" id="leads-slider" min="500" max="4500" value="4500" step="100"
+            style="background:linear-gradient(90deg,var(--gold) 100%,#333 100%)"
             oninput="updateROI()">
         </div>
 
         <div>
           <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:4px">
             <span style="color:rgba(255,255,255,0.8);font-size:15px;font-weight:600">Conversion Rate</span>
-            <span id="conversion-value" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">5%</span>
+            <span id="conversion-value" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">2%</span>
           </label>
-          <input type="range" id="conversion-slider" min="1" max="20" value="5" step="1"
-            style="background:linear-gradient(90deg,var(--gold) 20%,#333 20%)"
+          <input type="range" id="conversion-slider" min="0.5" max="10" value="2" step="0.5"
+            style="background:linear-gradient(90deg,var(--gold) 15.79%,#333 15.79%)"
             oninput="updateROI()">
         </div>
 
         <div>
           <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:4px">
-            <span style="color:rgba(255,255,255,0.8);font-size:15px;font-weight:600">Ø Auftragswert (CHF)</span>
-            <span style="color:rgba(255,255,255,0.4);font-size:12px">Dein durchschnittlicher Kundenauftrag</span>
+            <span style="color:rgba(255,255,255,0.8);font-size:15px;font-weight:600">&#216; Auftragswert (CHF)</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:12px">Ihr durchschnittlicher Kundenauftrag</span>
           </label>
-          <input type="number" id="revenue-input" value="5000" min="100" max="100000" step="100"
-            oninput="updateROI()" placeholder="5000">
+          <input type="number" id="revenue-input" value="350" min="50" max="100000" step="50"
+            oninput="updateROI()" placeholder="350">
         </div>
 
       </div>
 
       <div style="margin-top:40px;padding:20px 24px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.15);border-radius:12px;text-align:center">
         <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0 0 16px">
-          Bei <strong style="color:#F4D03F" id="roi-summary-leads">100 Leads</strong> und <strong style="color:#F4D03F" id="roi-summary-conversion">5% Conversion</strong> gewinnst du
-          <strong style="color:#10B981" id="roi-summary-customers">5 neue Kunden</strong> pro Monat –
-          das entspricht <strong style="color:#10B981" id="roi-summary-monthly">CHF 25'000</strong> zusätzlichem Umsatz.
+          Bei <strong style="color:#F4D03F" id="roi-summary-leads">4’500 Leads</strong> und <strong style="color:#F4D03F" id="roi-summary-conversion">2% Conversion</strong> gewinnen Sie
+          <strong style="color:#10B981" id="roi-summary-customers">90 neue Kunden</strong> pro Monat &ndash;
+          das entspricht <strong style="color:#10B981" id="roi-summary-monthly">CHF 31’500</strong> zusätzlichem Umsatz.
         </p>
-        <a href="https://www.zevix.ch/preise" class="cta-btn" style="padding:16px 48px;font-size:16px">
-          Diesen ROI jetzt erreichen →
-        </a>
+        <a href="https://www.zevix.ch/preise" class="cta-btn" style="padding:16px 48px;font-size:16px">Diesen ROI jetzt erreichen</a>
       </div>
 
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════
-     SECTION 8: FINAL CTA
-     ═══════════════════════════════════════════════ -->
+<!-- SECTION 8: FINAL CTA -->
 <section class="section" id="final-cta-section" style="background:linear-gradient(180deg,#000 0%,#0a0a0a 50%,#000 100%);text-align:center">
   <div class="container">
-
     <div style="max-width:700px;margin:0 auto">
-      <p style="color:rgba(212,175,55,0.7);font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 24px">Jetzt starten</p>
-      <h2 style="font-size:52px;font-weight:900;line-height:1.1;margin:0 0 24px;color:#fff">
-        Dein nächster<br><span class="gradient-text">Kunde wartet.</span>
-      </h2>
-      <p style="font-size:18px;color:rgba(255,255,255,0.6);line-height:1.7;margin:0 0 48px">
-        Hör auf, Zeit mit manueller Recherche zu verschwenden.<br class="trust-br">
-        Starte heute – kostenlos, ohne Kreditkarte.
-      </p>
 
-      <!-- Urgency Box -->
-      <div style="margin-bottom:40px;padding:20px 32px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:12px;display:inline-block">
-        <div style="color:rgba(255,255,255,0.7);font-size:14px;margin-bottom:6px">🔥 Noch heute verfügbar:</div>
-        <div>
-          <span id="final-spots-count" style="color:#F4D03F;font-weight:700;font-size:24px;font-family:'Manolo Mono',monospace">—</span>
-          <span style="color:rgba(255,255,255,0.7);font-size:16px"> freie Plätze</span>
-        </div>
+      <div style="margin-bottom:24px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 4px 16px rgba(212,175,55,0.5))"><path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#D4AF37" stroke="#F4D03F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <div style="margin-bottom:28px;padding:12px 28px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:10px;display:inline-block">
+        <span style="color:rgba(255,255,255,0.7);font-size:14px">Nur noch </span>
+        <span id="final-spots-count" style="color:#F4D03F;font-weight:700;font-size:18px;font-family:'Manolo Mono',monospace">&mdash;</span>
+        <span style="color:rgba(255,255,255,0.7);font-size:14px"> Plätze verfügbar</span>
       </div>
 
+      <h2 style="font-size:52px;font-weight:900;line-height:1.1;margin:0 0 24px;color:#fff">
+        Bereit für <span class="gradient-text">mehr Leads?</span>
+      </h2>
+      <p style="font-size:18px;color:rgba(255,255,255,0.6);line-height:1.7;margin:0 0 48px">
+        Starten Sie heute &ndash; 5 Tage kostenlos, ohne Kreditkarte.
+      </p>
+
       <div style="display:block">
-        <a href="https://www.zevix.ch/preise" class="cta-btn" style="margin-bottom:16px">
-          🚀 Jetzt kostenlos starten
-        </a>
+        <a href="https://www.zevix.ch/preise" class="cta-btn" style="margin-bottom:16px">Jetzt 5 Tage gratis testen</a>
         <div style="color:rgba(255,255,255,0.35);font-size:13px;margin-top:16px">
-          ✓ Keine Kreditkarte &nbsp;·&nbsp; ✓ Kein Risiko &nbsp;·&nbsp; ✓ Setup in 5 Min.
+          &#10003; Keine Kreditkarte &nbsp;&middot;&nbsp; &#10003; Kein Risiko &nbsp;&middot;&nbsp; &#10003; Jederzeit kündbar
         </div>
       </div>
     </div>
-
   </div>
 </section>
 
-
-<!-- ═══════════════════════════════════════════════
-     JAVASCRIPT
-     ═══════════════════════════════════════════════ -->
+<!-- JAVASCRIPT -->
 <script>
 (function() {
 'use strict';
 
-/* ─────────────────────────────────────────────
-   UTILITY: Swiss Number Format
-   ───────────────────────────────────────────── */
-function fmtCHF(n) {
-  return "CHF " + n.toLocaleString('de-CH');
-}
-function fmtNum(n) {
-  return n.toLocaleString('de-CH');
-}
+/* ── HELPERS ────────────────────────────────────── */
+var _fmt = new Intl.NumberFormat('de-CH');
+function fmtNum(n) { return _fmt.format(Math.round(n)); }
+function fmtCHF(n) { return 'CHF ' + _fmt.format(Math.round(n)); }
 
-/* ─────────────────────────────────────────────
-   SPOTS COUNTER (time-based: 333 → 33)
-   ───────────────────────────────────────────── */
-function initSpotsCounter() {
-  var h = new Date().getHours();
-  var spots;
-  if (h >= 0 && h < 6)       spots = 333;
-  else if (h >= 6 && h < 9)  spots = 287;
-  else if (h >= 9 && h < 12) spots = 214;
-  else if (h >= 12 && h < 15) spots = 156;
-  else if (h >= 15 && h < 18) spots = 98;
-  else if (h >= 18 && h < 21) spots = 67;
-  else                         spots = 33;
-
-  var els = [
-    document.getElementById('spots-count'),
-    document.getElementById('final-spots-count')
-  ];
-  els.forEach(function(el) {
-    if (el) el.textContent = fmtNum(spots);
-  });
-}
-
-/* ─────────────────────────────────────────────
-   TYPING ANIMATION
-   ───────────────────────────────────────────── */
-function initTypingAnimation() {
-  var el = document.getElementById('typed-text');
-  if (!el) return;
-
-  var words = ['Neue Firmen.', 'Neue Chancen.', 'Mehr Leads.'];
-  var wi = 0, ci = 0, deleting = false;
-  var TYPING_SPEED_MS = 80, DELETING_SPEED_MS = 45, PAUSE = 1800;
-
-  function tick() {
-    var word = words[wi];
-    if (!deleting) {
-      el.textContent = word.slice(0, ci + 1);
-      ci++;
-      if (ci === word.length) {
-        deleting = true;
-        setTimeout(tick, PAUSE);
-        return;
-      }
-    } else {
-      el.textContent = word.slice(0, ci - 1);
-      ci--;
-      if (ci === 0) {
-        deleting = false;
-        wi = (wi + 1) % words.length;
-      }
-    }
-    setTimeout(tick, deleting ? DELETING_SPEED_MS : TYPING_SPEED_MS);
-  }
-  tick();
-}
-
-/* ─────────────────────────────────────────────
-   LOGO TICKER (CSS keyframes + IntersectionObserver pause)
-   ───────────────────────────────────────────── */
+/* ── LOGO TICKER ────────────────────────────────── */
 function initLogoTicker() {
-  var ticker = document.getElementById('logo-ticker');
   var container = document.getElementById('logo-container');
+  var ticker = document.getElementById('logo-ticker');
   if (!ticker || !container) return;
 
-  // Inject keyframe if not present
+  var logos = [
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047722a079b684d1d96_PwC_Company_Logo.svg.png', alt: 'PwC' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047530fb155a1078ad0_Logo_of_Deloitte.svg.png', alt: 'Deloitte' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047f6925630c918fe63_KPMG_blue_logo.svg.png', alt: 'KPMG' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047a3c92d16efa83680_EY_logo_2019.svg.png', alt: 'EY' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047f989aa41f7cf7ec1_Adecco_logo.svg.png', alt: 'Adecco' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699730475d167b7bae7353b2_ManpowerGroup_logo.svg.png', alt: 'Manpower' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973047a3a8b94fa50f7d34_Randstad_Logo.svg.png', alt: 'Randstad' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6997304736470629db7139f2_Accenture.svg.png', alt: 'Accenture' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973048e04b41423721c83c_BDO_Deutsche_Warentreuhand_Logo.svg.png', alt: 'BDO' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6997304889ea2ca3f66149a6_Swisscom_Logo.svg.png', alt: 'Swisscom' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/699730487f4c8a1c66518302_UBS_Logo.svg.png', alt: 'UBS' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6997304815a314e442c6f18d_Zurich_Insurance_Group_logo.svg.png', alt: 'Zurich' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/69973048a24b7706c21d27cf_AXA_Logo.svg.png', alt: 'AXA' },
+    { url: 'https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6997304759672536b3757106_Helvetia_(Versicherung)_logo.svg', alt: 'Helvetia' }
+  ];
+
+  var html = '';
+  for (var i = 0; i < 3; i++) {
+    logos.forEach(function(logo) {
+      html += '<img src="' + logo.url + '" alt="' + (i === 0 ? logo.alt : '') + '"' +
+        ' style="height:40px;opacity:0.7;filter:grayscale(100%) brightness(1.8);flex-shrink:0"' +
+        (i > 0 ? ' aria-hidden="true"' : '') + '>';
+    });
+  }
+  ticker.innerHTML = html;
+
   var styleId = 'logo-ticker-style';
   if (!document.getElementById(styleId)) {
-    var style = document.createElement('style');
-    style.id = styleId;
-    // Scroll offset = 100% / 3 tracks = 33.333% (seamless infinite loop)
-    style.textContent = '@keyframes logo-scroll{0%{transform:translateX(0)}100%{transform:translateX(-33.333%)}}';
-    document.head.appendChild(style);
+    var s = document.createElement('style');
+    s.id = styleId;
+    s.textContent = '@keyframes logo-scroll{0%{transform:translateX(0)}100%{transform:translateX(-33.333%)}}';
+    document.head.appendChild(s);
   }
-
   ticker.style.animation = 'logo-scroll 40s linear infinite';
 
-  // Pause when not visible (memory leak fix)
   if ('IntersectionObserver' in window) {
     var obs = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        ticker.style.animationPlayState = entry.isIntersecting ? 'running' : 'paused';
+      entries.forEach(function(e) {
+        ticker.style.animationPlayState = e.isIntersecting ? 'running' : 'paused';
       });
-    }, {threshold: 0});
+    }, { threshold: 0 });
     obs.observe(container);
   }
 }
 
-/* ─────────────────────────────────────────────
-   ROI CALCULATOR
-   ───────────────────────────────────────────── */
+/* ── TYPING ANIMATION ───────────────────────────── */
+function initTyping() {
+  var phrases = ['Neue Firmen.', 'Neue Chancen.', 'Mehr Leads.'];
+  var el = document.getElementById('typed-text');
+  var cursor = document.getElementById('cursor');
+  if (!el) return;
+  var phraseIndex = 0, charIndex = 0, currentText = '';
+
+  function type() {
+    if (phraseIndex >= phrases.length) {
+      if (cursor) cursor.style.display = 'inline';
+      return;
+    }
+    var phrase = phrases[phraseIndex];
+    if (charIndex < phrase.length) {
+      currentText += phrase[charIndex];
+      el.textContent = currentText;
+      charIndex++;
+      setTimeout(type, 80);
+    } else {
+      if (phraseIndex < phrases.length - 1) {
+        setTimeout(erase, 1400);
+      } else {
+        if (cursor) cursor.style.display = 'inline';
+      }
+    }
+  }
+
+  function erase() {
+    if (currentText.length > 0) {
+      currentText = currentText.slice(0, -1);
+      el.textContent = currentText;
+      setTimeout(erase, 45);
+    } else {
+      phraseIndex++;
+      charIndex = 0;
+      setTimeout(type, 350);
+    }
+  }
+
+  setTimeout(type, 900);
+}
+
+/* ── ROI CALCULATOR ─────────────────────────────── */
 function updateROI() {
   var leadsSlider = document.getElementById('leads-slider');
   var convSlider = document.getElementById('conversion-slider');
   var revInput = document.getElementById('revenue-input');
   if (!leadsSlider || !convSlider || !revInput) return;
 
-  var MAX_REVENUE = 100000; // Maximum allowed order value (CHF)
-  var PLAN_COST_CHF = 49;   // Starter plan monthly cost (CHF)
-
   var leads = parseInt(leadsSlider.value, 10) || 0;
-  var conv = parseInt(convSlider.value, 10) || 0;
-  var rev = Math.min(parseInt(revInput.value, 10) || 0, MAX_REVENUE);
+  var conv = parseFloat(convSlider.value) || 0;
+  var rev = Math.min(parseInt(revInput.value, 10) || 0, 100000);
 
-  // Update slider track gradient
-  var leadsP = ((leads - 10) / (1000 - 10) * 100).toFixed(1);
-  var convP = ((conv - 1) / (20 - 1) * 100).toFixed(1);
+  var planCost, planLabel;
+  if (leads <= 500) { planCost = 69; planLabel = 'Basic – CHF 69/Mt.'; }
+  else if (leads <= 1000) { planCost = 100; planLabel = 'Business – CHF 100/Mt.'; }
+  else { planCost = 200; planLabel = 'Enterprise – CHF 200/Mt.'; }
+
+  var leadsP = ((leads - 500) / (4500 - 500) * 100).toFixed(1);
+  var convP = ((conv - 0.5) / (10 - 0.5) * 100).toFixed(1);
   leadsSlider.style.background = 'linear-gradient(90deg,var(--gold) ' + leadsP + '%,#333 ' + leadsP + '%)';
   convSlider.style.background = 'linear-gradient(90deg,var(--gold) ' + convP + '%,#333 ' + convP + '%)';
 
-  // Update display values
   var leadsVal = document.getElementById('leads-value');
   var convVal = document.getElementById('conversion-value');
   if (leadsVal) leadsVal.textContent = fmtNum(leads);
   if (convVal) convVal.textContent = conv + '%';
 
-  // Calculate
   var newCustomers = Math.round(leads * conv / 100);
   var monthly = newCustomers * rev;
   var yearly = monthly * 12;
-  var roiMultiple = PLAN_COST_CHF > 0 ? (monthly / PLAN_COST_CHF).toFixed(1) : '∞';
+  var roi = planCost > 0 ? Math.round(((monthly - planCost) / planCost) * 100) : 0;
 
-  // Update result boxes with highlight animation
   function setVal(id, val) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = val;
-    el.closest('.roi-results > div') && el.closest('.roi-results > div').classList.add('highlight-result');
-    setTimeout(function() {
-      var p = el.closest ? el.closest('.roi-results > div') : null;
-      if (p) p.classList.remove('highlight-result');
-    }, 700);
+    var el2 = document.getElementById(id);
+    if (!el2) return;
+    el2.textContent = val;
+    var parent = el2.closest ? el2.closest('.roi-results > div') : null;
+    if (parent) {
+      parent.classList.add('highlight-result');
+      setTimeout(function() { parent.classList.remove('highlight-result'); }, 700);
+    }
   }
   setVal('new-customers', fmtNum(newCustomers));
   setVal('monthly-revenue', fmtCHF(monthly));
   setVal('yearly-revenue', fmtCHF(yearly));
-  document.getElementById('roi') && (document.getElementById('roi').textContent = roiMultiple + 'x');
+  setVal('roi', roi + '%');
 
-  // Update summary text
+  var planEl = document.getElementById('plan-name');
+  if (planEl) planEl.textContent = planLabel;
+
   var sLeads = document.getElementById('roi-summary-leads');
   var sConv = document.getElementById('roi-summary-conversion');
   var sCust = document.getElementById('roi-summary-customers');
@@ -835,189 +731,176 @@ function updateROI() {
   if (sCust) sCust.textContent = fmtNum(newCustomers) + ' neue Kunden';
   if (sMon) sMon.textContent = fmtCHF(monthly);
 }
+window.updateROI = updateROI;
 
-/* ─────────────────────────────────────────────
-   LIVE DEMO BADGE – scroll to demo on mobile
-   ───────────────────────────────────────────── */
-function initLiveDemoBadge() {
-  var badge = document.getElementById('live-demo-badge');
-  var section = document.getElementById('demo-section');
-  if (!badge || !section) return;
-  badge.addEventListener('click', function() {
-    if (window.innerWidth < 992) {
-      section.scrollIntoView({behavior: 'smooth', block: 'start'});
-    }
-  });
-}
-
-/* ─────────────────────────────────────────────
-   WORKFLOW CARD DETAILS (click to expand)
-   ───────────────────────────────────────────── */
+/* ── WORKFLOW CARD TOGGLE ───────────────────────── */
 function toggleWfDetail(card) {
   var detail = card.querySelector('.wf-detail');
   if (!detail) return;
   var isOpen = detail.classList.contains('show');
-  // Close all
   document.querySelectorAll('.wf-detail.show').forEach(function(d) {
     d.classList.remove('show');
-    d.closest('.wf-card') && d.closest('.wf-card').classList.remove('active');
+    var c = d.closest ? (d.closest('.wf-card') || d.closest('.wf-small')) : null;
+    if (c) c.classList.remove('active');
   });
-  // Toggle clicked
   if (!isOpen) {
     detail.classList.add('show');
     card.classList.add('active');
   }
 }
-// Expose globally (used inline onclick)
 window.toggleWfDetail = toggleWfDetail;
 
-/* ─────────────────────────────────────────────
-   LAZY VIDEO LOADING via IntersectionObserver
-   ───────────────────────────────────────────── */
+/* ── LIVE DEMO BADGE ────────────────────────────── */
+function initLiveDemoBadge() {
+  var badge = document.getElementById('live-demo-badge');
+  var section = document.getElementById('demo-section');
+  if (!badge || !section) return;
+  badge.addEventListener('click', function() {
+    if (window.innerWidth < 992) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+/* ── SPOTS COUNTER ──────────────────────────────── */
+function initSpotsCounter() {
+  var base = 27;
+  var hour = new Date().getHours();
+  var count = Math.max(3, base - Math.floor(hour * 1.1));
+  ['spots-count', 'final-spots-count'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = count;
+  });
+}
+
+/* ── HERO SEQUENCE ──────────────────────────────── */
+function initHeroSequence() {
+  var overlay = document.getElementById('logo-reveal-overlay');
+  var bigLogo = document.getElementById('hero-logo-big');
+  var video = document.getElementById('hero-video');
+  if (!bigLogo || !video) return;
+  setTimeout(function() {
+    bigLogo.style.transform = 'scale(1.12)';
+    setTimeout(function() {
+      bigLogo.style.opacity = '0';
+      video.style.opacity = '0.65';
+      setTimeout(function() {
+        if (overlay) overlay.style.display = 'none';
+      }, 900);
+    }, 700);
+  }, 600);
+}
+
+/* ── TEXT OVERLAY CYCLE ─────────────────────────── */
+function initTextOverlay() {
+  var el = document.getElementById('text-overlay');
+  if (!el) return;
+  var phrases = [
+    'ZEVIX.CH · KI-LEADGENERIERUNG',
+    '4500+ LEADS PRO MONAT',
+    'DSG-KONFORM · SCHWEIZER QUALITÄT',
+    'TÄGLICH AKTUALISIERT',
+    'ZEVIX.CH · KI-LEADGENERIERUNG'
+  ];
+  var idx = 0;
+  setInterval(function() {
+    el.style.opacity = '0';
+    setTimeout(function() {
+      idx = (idx + 1) % phrases.length;
+      el.textContent = phrases[idx];
+      el.style.opacity = '1';
+    }, 500);
+  }, 4000);
+}
+
+/* ── LAZY VIDEOS ────────────────────────────────── */
 function initLazyVideos() {
   var videos = document.querySelectorAll('video[preload="none"]');
   if (!('IntersectionObserver' in window)) {
-    // Fallback: load all
-    videos.forEach(function(v) {
-      v.preload = 'auto';
-      v.load();
-      v.play().catch(function(){});
-    });
+    videos.forEach(function(v) { v.preload = 'auto'; v.load(); v.play().catch(function() {}); });
     return;
   }
-
   var obs = new IntersectionObserver(function(entries) {
     entries.forEach(function(entry) {
       if (entry.isIntersecting) {
-        var video = entry.target;
-        video.preload = 'auto';
-        video.load();
-        video.play().catch(function(){});
-        obs.unobserve(video);
+        var v = entry.target;
+        v.preload = 'auto'; v.load(); v.play().catch(function() {});
+        obs.unobserve(v);
       }
     });
-  }, {rootMargin: '200px'});
-
+  }, { rootMargin: '200px' });
   videos.forEach(function(v) { obs.observe(v); });
 }
 
-/* ─────────────────────────────────────────────
-   HERO VIDEO: fade-in + logo zoom
-   ───────────────────────────────────────────── */
-function initHeroVideo() {
-  var video = document.getElementById('hero-video');
-  var logo = document.getElementById('hero-logo');
-  if (!video) return;
-
-  video.addEventListener('playing', function() {
-    video.style.opacity = '0.35';
-    if (logo) logo.style.transform = 'scale(1.06)';
-  }, {once: true});
-
-  // Load on viewport entry
-  if ('IntersectionObserver' in window) {
-    var obs = new IntersectionObserver(function(entries) {
-      if (entries[0].isIntersecting) {
-        video.preload = 'auto';
-        video.load();
-        video.play().catch(function(){});
-        obs.unobserve(video);
-      }
-    }, {threshold: 0.1});
-    obs.observe(video);
-  } else {
-    video.preload = 'auto';
-    video.load();
-    video.play().catch(function(){});
-  }
-}
-
-/* ─────────────────────────────────────────────
-   EXIT POPUP
-   - Desktop: mouseleave (top of page)
-   - Mobile: visibilitychange
-   - IP-based city via ipapi.co with 3s timeout
-   - Duplicate prevention
-   - ESC + backdrop click to close
-   ───────────────────────────────────────────── */
+/* ── EXIT POPUP ─────────────────────────────────── */
 function initExitPopup() {
-  // Duplicate prevention
-  if (document.getElementById('exit-popup')) return;
-
   var shown = false;
-  var cityName = 'deiner Stadt';
-
-  var API_TIMEOUT_MS = 3000; // Abort ipapi.co fetch after this duration
-
-  // Fetch city with AbortController
-  var controller = new AbortController();
-  var timeoutId = setTimeout(function() { controller.abort(); }, API_TIMEOUT_MS);
-  fetch('https://ipapi.co/json/', {signal: controller.signal})
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d && d.city) cityName = d.city; })
-    .catch(function(){})
-    .finally(function() { clearTimeout(timeoutId); });
+  var city = '';
+  if ('AbortController' in window) {
+    var controller = new AbortController();
+    var timeout = setTimeout(function() { controller.abort(); }, 3000);
+    fetch('https://ipapi.co/json/', { signal: controller.signal })
+      .then(function(r) { if (!r.ok) throw new Error('network'); return r.json(); })
+      .then(function(d) { clearTimeout(timeout); city = (d && typeof d.city === 'string') ? d.city : ''; })
+      .catch(function() { clearTimeout(timeout); city = ''; });
+  }
 
   function showPopup() {
-    if (shown || document.getElementById('exit-popup')) return;
+    if (shown) return;
     shown = true;
-
+    var cityText = city
+      ? ('Auch in ' + city + ' nutzen Unternehmen Zevix bereits.')
+      : 'Hunderte Schweizer Unternehmen vertrauen bereits Zevix.';
     var overlay = document.createElement('div');
-    overlay.id = 'exit-popup';
+    overlay.id = 'exit-popup-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.85);animation:fadeIn .35s ease';
-
-    overlay.innerHTML = '<div style="background:linear-gradient(135deg,#0d0d0d,#1a1a1a);border:2px solid rgba(212,175,55,0.35);border-radius:20px;padding:40px 36px;max-width:460px;width:100%;position:relative;box-shadow:0 30px 80px rgba(0,0,0,0.8),0 0 0 1px rgba(212,175,55,0.1)">' +
-      '<button id="exit-popup-close" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.06);border:none;color:rgba(255,255,255,0.5);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>' +
-      '<div style="font-size:36px;margin-bottom:16px;text-align:center">🎁</div>' +
-      '<h3 style="color:#F4D03F;font-size:24px;font-weight:800;margin:0 0 12px;text-align:center;font-family:\'Manolo Mono\',monospace">Warte kurz!</h3>' +
-      '<p style="color:rgba(255,255,255,0.75);font-size:15px;line-height:1.6;text-align:center;margin:0 0 24px">Du verlässt die Seite – aber wusstest du, dass gerade Firmen aus <strong style="color:#F4D03F">' + cityName + '</strong> nach Lösungen wie Zevix suchen?</p>' +
-      '<a href="https://www.zevix.ch/preise" class="cta-btn" style="width:100%;justify-content:center;padding:16px;font-size:16px">🚀 Jetzt kostenlos testen</a>' +
-      '<p style="color:rgba(255,255,255,0.3);font-size:12px;text-align:center;margin:16px 0 0">Keine Kreditkarte · Jederzeit kündbar</p>' +
+    overlay.innerHTML =
+      '<div style="background:linear-gradient(135deg,#0d0d0d,#1a1a1a);border:2px solid rgba(212,175,55,0.4);border-radius:20px;padding:40px 36px;max-width:460px;width:100%;position:relative;box-shadow:0 30px 80px rgba(0,0,0,0.8)">' +
+      '<button onclick="document.getElementById(\'exit-popup-overlay\').remove()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:rgba(255,255,255,0.4);font-size:22px;cursor:pointer;line-height:1;padding:4px 8px">&times;</button>' +
+      '<div style="text-align:center;margin-bottom:24px">' +
+        '<h3 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 8px;font-family:\'Manolo Mono\',monospace">Warte kurz!</h3>' +
+        '<p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.6;margin:0">' + cityText + '</p>' +
+      '</div>' +
+      '<div style="background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center">' +
+        '<div style="color:#F4D03F;font-size:22px;font-weight:800;margin-bottom:4px;font-family:\'Manolo Mono\',monospace">5 Tage kostenlos</div>' +
+        '<div style="color:rgba(255,255,255,0.6);font-size:14px">Kein Risiko. Keine Kreditkarte. Jederzeit kündbar.</div>' +
+      '</div>' +
+      '<a href="https://www.zevix.ch/preise" class="cta-btn" style="width:100%;justify-content:center;padding:16px;font-size:16px;display:flex">Jetzt kostenlos testen</a>' +
       '</div>';
-
     document.body.appendChild(overlay);
-
-    // Close handlers
-    function closePopup() {
-      var p = document.getElementById('exit-popup');
-      if (p) p.remove();
-    }
-    document.getElementById('exit-popup-close').addEventListener('click', closePopup);
     overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) closePopup();
-    });
-    document.addEventListener('keydown', function escHandler(e) {
-      if (e.key === 'Escape') { closePopup(); document.removeEventListener('keydown', escHandler); }
+      if (e.target === overlay) overlay.remove();
     });
   }
 
-  // Desktop: mouse leaves top of viewport
-  var isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (!isMobile) {
-    document.addEventListener('mouseleave', function(e) {
-      if (e.clientY < 10) showPopup();
-    });
-  } else {
-    // Mobile: visibility change (tab switch / home button)
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden) showPopup();
-    });
-  }
+  document.addEventListener('mouseleave', function(e) {
+    if (e.clientY < 5) showPopup();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var pop = document.getElementById('exit-popup-overlay');
+      if (pop) pop.remove();
+    }
+  });
+  setTimeout(showPopup, 45000);
 }
 
-/* ─────────────────────────────────────────────
-   INIT on DOMContentLoaded
-   ───────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', function() {
-  initSpotsCounter();
-  initTypingAnimation();
+/* ── INIT ───────────────────────────────────────── */
+function init() {
+  initHeroSequence();
+  initTyping();
   initLogoTicker();
   initLazyVideos();
-  initHeroVideo();
   initLiveDemoBadge();
-  initExitPopup();
+  initSpotsCounter();
+  initTextOverlay();
   updateROI();
-});
+  setTimeout(initExitPopup, 2000);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 })();
 </script>
