@@ -6,11 +6,13 @@ import json
 import psycopg
 import stripe
 import time
-from datetime import datetime, timedelta
+import requests as http_requests
+from datetime import datetime, timedelta, date
 from flask import Blueprint, jsonify, request, session
 from hmac import compare_digest
 from psycopg.rows import dict_row
 from threading import Lock
+import openai
 
 # ---------------------------- CONFIG ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -40,6 +42,28 @@ LEADS_LIMIT_BY_PLAN = {
     "business": 1000,
     "enterprise": 4500,
 }
+
+# ---------------------------- SHAB CONFIG ----------------------------
+ALLE_KANTONE = [
+    "AG", "AI", "AR", "BE", "BL", "BS", "FR", "GE", "GL", "GR",
+    "JU", "LU", "NE", "NW", "OW", "SG", "SH", "SO", "SZ", "TG",
+    "TI", "UR", "VD", "VS", "ZG", "ZH",
+]
+
+RECHTSFORMEN = {
+    "0101": "Einzelunternehmen",
+    "0103": "Kollektivgesellschaft",
+    "0104": "Kommanditgesellschaft",
+    "0106": "Aktiengesellschaft",
+    "0107": "GmbH",
+    "0108": "Genossenschaft",
+    "0109": "Verein",
+    "0110": "Stiftung",
+    "0113": "Zweigniederlassung",
+}
+
+SHAB_API_URL = "https://www.shab.ch/api/v1/publications"
+SHAB_PAGE_SIZE = 2000
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -436,6 +460,100 @@ def should_sync_stripe_plan(email: str, current_plan: str) -> bool:
     
     # Cache expired or missing for paid plan
     return True
+
+
+# ---------------------------- SHAB HELPERS ----------------------------
+def ai_branche(zweck: str) -> str:
+    """Classify a company's industry sector using OpenAI GPT based on its purpose text."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or not zweck:
+        return "Sonstige"
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Du bist Handelsregister-Analyst. Ordne Firmen anhand ihres Zwecks EINER Branche zu. "
+                        "Antworte NUR mit einem Branchentitel (1-3 Wörter).\n\n"
+                        "ERLAUBTE BRANCHEN:\n"
+                        "Autohandel, IT / Software, Gastronomie, Transport / Logistik, "
+                        "Baugewerbe, Immobilien, Handel, Industrie, Dienstleistungen, "
+                        "Gesundheitswesen, Sonstige"
+                    ),
+                },
+                {"role": "user", "content": zweck[:500]},
+            ],
+            max_tokens=20,
+            temperature=0,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        logging.warning("GPT Branchenklassifizierung fehlgeschlagen: %s", exc)
+        return "Sonstige"
+
+
+def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
+    """Fetch HR01 (new registrations) from the SHAB API for all cantons."""
+    params = {
+        "subRubrics": "HR01",
+        "includeContent": "true",
+        "publicationStates": "PUBLISHED",
+        "publicationDate": datum_von,
+        "publicationDateEnd": datum_bis,
+        "cantons": ",".join(ALLE_KANTONE),
+        "pageSize": SHAB_PAGE_SIZE,
+        "pageNumber": 0,
+    }
+    all_publications = []
+    page = 0
+    while True:
+        params["pageNumber"] = page
+        try:
+            resp = http_requests.get(SHAB_API_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as exc:
+            logging.warning("SHAB API Fehler (Seite %d): %s", page, exc)
+            break
+
+        content = data.get("content") or []
+        all_publications.extend(content)
+
+        # Check pagination
+        total_pages = data.get("totalPages", 1)
+        if page + 1 >= total_pages or not content:
+            break
+        page += 1
+
+    return all_publications
+
+
+def ensure_leads_table(cur) -> None:
+    """Create the leads table if it doesn't exist yet."""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS leads (
+            id SERIAL PRIMARY KEY,
+            uid VARCHAR(20) UNIQUE,
+            firma VARCHAR(500),
+            rechtsform VARCHAR(100),
+            strasse VARCHAR(200),
+            hausnummer VARCHAR(20),
+            plz VARCHAR(10),
+            ort VARCHAR(100),
+            sitz VARCHAR(100),
+            kanton VARCHAR(5),
+            zweck TEXT,
+            branche_ai VARCHAR(100),
+            publikation_datum DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_leads_datum ON leads(publikation_datum)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_leads_kanton ON leads(kanton)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_leads_branche ON leads(branche_ai)")
 
 
 # ---------------------------- Blueprint für ZEVIX ----------------------------
@@ -1185,4 +1303,237 @@ def cache_stats():
             "deduplication_enabled": True,
             "expected_api_reduction": "60-80%",
         }
+    })
+
+
+# ---------------------------- SYNC SHAB ----------------------------
+@zevix_bp.route("/zevix/sync-shab", methods=["POST"])
+def sync_shab():
+    """
+    Fetches new company registrations (HR01) from the SHAB API,
+    classifies their industry via GPT and upserts them into the leads table.
+    Requires a valid JWT token (admin/authenticated users only).
+    """
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+
+    user_email = None
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_email = payload.get("email")
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "token_expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "invalid_token"}), 401
+
+    if not user_email:
+        user_email = session.get("email")
+
+    if not user_email:
+        return jsonify({"success": False, "error": "not_authenticated"}), 401
+
+    data = request_payload() or {}
+    today = date.today().isoformat()
+    datum_von = data.get("datum_von") or today
+    datum_bis = data.get("datum_bis") or today
+
+    publications = fetch_shab_neueintragungen(datum_von, datum_bis)
+
+    inserted = 0
+    updated = 0
+    errors = 0
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_leads_table(cur)
+                conn.commit()
+
+                for pub in publications:
+                    try:
+                        meta = pub.get("meta") or {}
+                        content = (pub.get("content") or {}).get("commonsNew") or {}
+                        company = content.get("company") or {}
+                        address = company.get("address") or {}
+
+                        uid = company.get("uid") or ""
+                        if not uid:
+                            continue
+
+                        firma = company.get("name") or ""
+                        legal_form_code = str(company.get("legalForm") or "")
+                        rechtsform = RECHTSFORMEN.get(legal_form_code, legal_form_code)
+                        strasse = address.get("street") or ""
+                        hausnummer = address.get("houseNumber") or ""
+                        plz = str(address.get("swissZipCode") or "")
+                        ort = address.get("town") or ""
+                        sitz = company.get("seat") or ort
+                        cantons = meta.get("cantons") or []
+                        kanton = cantons[0] if cantons else ""
+                        zweck = content.get("purpose") or ""
+                        pub_date_raw = meta.get("publicationDate") or ""
+                        try:
+                            pub_date = pub_date_raw[:10] if pub_date_raw else None
+                        except Exception:
+                            pub_date = None
+
+                        branche = ai_branche(zweck)
+
+                        cur.execute(
+                            """
+                            INSERT INTO leads
+                                (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                                 sitz, kanton, zweck, branche_ai, publikation_datum)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (uid) DO UPDATE SET
+                                firma = EXCLUDED.firma,
+                                rechtsform = EXCLUDED.rechtsform,
+                                strasse = EXCLUDED.strasse,
+                                hausnummer = EXCLUDED.hausnummer,
+                                plz = EXCLUDED.plz,
+                                ort = EXCLUDED.ort,
+                                sitz = EXCLUDED.sitz,
+                                kanton = EXCLUDED.kanton,
+                                zweck = EXCLUDED.zweck,
+                                branche_ai = EXCLUDED.branche_ai,
+                                publikation_datum = EXCLUDED.publikation_datum
+                            """,
+                            (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                             sitz, kanton, zweck, branche, pub_date),
+                        )
+                        if cur.rowcount == 1:
+                            inserted += 1
+                        else:
+                            updated += 1
+                    except Exception as exc:
+                        logging.warning("Fehler beim Verarbeiten eines SHAB-Eintrags: %s", exc)
+                        errors += 1
+
+                conn.commit()
+    except Exception as exc:
+        logging.error("SHAB-Sync fehlgeschlagen: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({
+        "success": True,
+        "datum_von": datum_von,
+        "datum_bis": datum_bis,
+        "total": len(publications),
+        "inserted": inserted,
+        "updated": updated,
+        "errors": errors,
+    })
+
+
+# ---------------------------- LEADS ----------------------------
+@zevix_bp.route("/zevix/leads", methods=["GET"])
+def get_leads():
+    """
+    Returns leads from the database with optional filtering.
+    Requires a valid JWT token.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+
+    user_email = None
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_email = payload.get("email")
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "token_expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "invalid_token"}), 401
+
+    if not user_email:
+        user_email = session.get("email")
+
+    if not user_email:
+        return jsonify({"success": False, "error": "not_authenticated"}), 401
+
+    datum_von = request.args.get("datum_von")
+    datum_bis = request.args.get("datum_bis")
+    kanton = request.args.get("kanton")
+    branche = request.args.get("branche")
+    try:
+        limit = int(request.args.get("limit", 1000))
+    except ValueError:
+        limit = 1000
+    try:
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        offset = 0
+
+    conditions = []
+    params = []
+
+    if datum_von:
+        conditions.append("publikation_datum >= %s")
+        params.append(datum_von)
+    if datum_bis:
+        conditions.append("publikation_datum <= %s")
+        params.append(datum_bis)
+    if kanton:
+        conditions.append("kanton = %s")
+        params.append(kanton.upper())
+    if branche:
+        conditions.append("branche_ai ILIKE %s")
+        params.append(f"%{branche}%")
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_leads_table(cur)
+                conn.commit()
+
+                query = f"""
+                    SELECT id, uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                           sitz, kanton, zweck, branche_ai, publikation_datum, created_at
+                    FROM leads
+                    {where_clause}
+                    ORDER BY publikation_datum DESC, id DESC
+                    LIMIT %s OFFSET %s
+                """
+                params.extend([limit, offset])
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                leads = []
+                for row in rows:
+                    pub_date = row.get("publikation_datum")
+                    created_at = row.get("created_at")
+                    leads.append({
+                        "id": row.get("id"),
+                        "uid": row.get("uid"),
+                        "firma": row.get("firma"),
+                        "rechtsform": row.get("rechtsform"),
+                        "strasse": row.get("strasse"),
+                        "hausnummer": row.get("hausnummer"),
+                        "plz": row.get("plz"),
+                        "ort": row.get("ort"),
+                        "sitz": row.get("sitz"),
+                        "kanton": row.get("kanton"),
+                        "zweck": row.get("zweck"),
+                        "branche_ai": row.get("branche_ai"),
+                        "publikation_datum": pub_date.isoformat() if pub_date else None,
+                        "created_at": created_at.isoformat() if created_at else None,
+                    })
+
+    except Exception as exc:
+        logging.error("Fehler beim Laden der Leads: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({
+        "success": True,
+        "leads": leads,
+        "count": len(leads),
+        "limit": limit,
+        "offset": offset,
     })

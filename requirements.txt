@@ -5,3 +5,5 @@ psycopg[binary]
 bcrypt
 stripe
 pyjwt
+openai
+requests
