@@ -1488,7 +1488,11 @@ def cron_sync():
 
     logging.info("CRON: Starting daily SHAB sync for %s", yesterday)
 
-    publications = fetch_shab_neueintragungen(yesterday, yesterday)
+    try:
+        publications = fetch_shab_neueintragungen(yesterday, yesterday)
+    except Exception as exc:
+        logging.error("CRON: SHAB API error: %s", exc)
+        return jsonify({"success": False, "error": f"SHAB API error: {exc}"}), 500
 
     if not publications:
         logging.info("CRON: No new entries found for %s", yesterday)
@@ -1539,7 +1543,12 @@ def cron_sync():
                         pub_date_raw = meta.get("publicationDate") or ""
                         pub_date = pub_date_raw[:10] if pub_date_raw else None
 
-                        branche = ai_branche(zweck)
+                        # GPT Klassifizierung - mit Fehlerbehandlung
+                        try:
+                            branche = ai_branche(zweck) if zweck else ""
+                        except Exception as gpt_err:
+                            logging.warning("CRON: GPT error for %s: %s", uid, gpt_err)
+                            branche = ""
 
                         cur.execute(
                             """
@@ -1571,11 +1580,11 @@ def cron_sync():
                         else:
                             updated += 1
 
-                        if (inserted + updated) % 10 == 0:
-                            conn.commit()
+                        # Commit nach jedem Lead (verhindert lange Transaktionen)
+                        conn.commit()
 
                     except Exception as exc:
-                        logging.warning("CRON: Error processing publication: %s", exc)
+                        logging.warning("CRON: Error processing %s: %s", uid if uid else "unknown", exc)
                         errors += 1
                         continue
 
