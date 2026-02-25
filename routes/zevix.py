@@ -62,7 +62,7 @@ RECHTSFORMEN = {
     "0113": "Zweigniederlassung",
 }
 
-ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/shab/search"
+ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/company/search"
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -495,37 +495,32 @@ def ai_branche(zweck: str) -> str:
 
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
-    """Fetch HR01 (new registrations) from the Zefix SHAB API."""
-    payload = {
-        "shabDateFrom": datum_von,
-        "shabDateTo": datum_bis,
-        "subRubric": "HR01",
-        "maxEntries": 2000,
-        "offset": 0,
-    }
+    """Fetch new company registrations from the public Zefix API."""
+    all_results = []
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    all_results = []
-    offset = 0
-    while True:
-        payload["offset"] = offset
+    for kanton in ALLE_KANTONE:
+        payload = {
+            "registrationDateFrom": datum_von,
+            "registrationDateTo": datum_bis,
+            "legalSeats": [kanton],
+            "maxEntries": 500,
+        }
         try:
-            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=60)
+            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=30)
             resp.raise_for_status()
             data = resp.json()
+            if isinstance(data, list):
+                results = data
+            else:
+                results = data.get("list") or data.get("companies") or []
+            all_results.extend(results)
+            logging.info("Zefix: %d Firmen für Kanton %s gefunden", len(results), kanton)
         except Exception as exc:
-            logging.warning("Zefix SHAB API Fehler (offset %d): %s", offset, exc)
-            break
-
-        results = data.get("list") or []
-        all_results.extend(results)
-
-        if len(results) < payload["maxEntries"]:
-            break
-        offset += len(results)
-
+            logging.warning("Zefix API Fehler für Kanton %s: %s", kanton, exc)
+            continue
     return all_results
 
 
@@ -1357,7 +1352,10 @@ def sync_shab():
                             continue
 
                         firma = pub.get("name") or ""
-                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(pub.get("legalForm") or ""), "")
+                        legal_form = pub.get("legalFormId") or pub.get("legalForm")
+                        if isinstance(legal_form, int):
+                            legal_form = str(legal_form).zfill(4)
+                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(legal_form or ""), "")
 
                         address = pub.get("address") or {}
                         strasse = address.get("street") or ""
@@ -1366,9 +1364,9 @@ def sync_shab():
                         ort = address.get("city") or pub.get("legalSeat") or ""
 
                         sitz = pub.get("legalSeat") or ort
-                        kanton = pub.get("canton") or ""
+                        kanton = pub.get("cantonIso") or pub.get("canton") or ""
                         zweck = pub.get("purpose") or ""
-                        pub_date_raw = pub.get("shabDate") or pub.get("shabPubDate") or ""
+                        pub_date_raw = pub.get("shabDate") or pub.get("registrationDate") or pub.get("shabPubDate") or ""
                         try:
                             pub_date = pub_date_raw[:10] if pub_date_raw else None
                         except Exception:
