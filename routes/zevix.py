@@ -62,7 +62,7 @@ RECHTSFORMEN = {
     "0113": "Zweigniederlassung",
 }
 
-SHAB_API_URL = "https://www.shab.ch/api/v1/public/search/shab/notice"
+SHAB_API_URL = "https://www.shab.ch/api/v1/publications"
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -523,69 +523,40 @@ def ai_branche(zweck: str) -> str:
 
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
-    """Fetch HR01 (new company registrations) from the official SHAB.ch public API."""
+    """Fetch HR01 (new company registrations) from the official SHAB.ch API."""
     # Convert dates to ISO format
     datum_von = parse_date_to_iso(datum_von)
     datum_bis = parse_date_to_iso(datum_bis)
 
-    all_results = []
-    page = 1
-    pagesize = 100
+    params = {
+        "allowRubricSelection": "true",
+        "cantons": ",".join(ALLE_KANTONE),
+        "includeContent": "true",
+        "pageRequest.page": "0",
+        "pageRequest.size": "2000",
+        "publicationStates": "PUBLISHED",
+        "publicationDate.start": datum_von,
+        "publicationDate.end": datum_bis,
+        "subRubrics": "HR01",
+    }
 
-    while True:
-        params = {
-            "heading": "hr",
-            "subheading": "hr01",
-            "publicationTime.from": datum_von,
-            "publicationTime.to": datum_bis,
-            "page": page,
-            "pagesize": pagesize,
-        }
-
-        headers = {
-            "Accept": "application/json",
-            "Accept-Language": "de",
-        }
-
-        try:
-            resp = http_requests.get(SHAB_API_URL, params=params, headers=headers, timeout=60)
-            resp.raise_for_status()
-            data = resp.json()
-
-            results = data.get("results") or []
-            all_results.extend(results)
-
-            logging.info("SHAB API: Page %d - %d results fetched (total so far: %d)",
-                         page, len(results), len(all_results))
-
-            # Check if we have more pages
-            page_count = data.get("pageCount", 0)
-            if page >= page_count:
-                break
-
-            page += 1
-
-        except Exception as exc:
-            logging.warning("SHAB API error on page %d: %s", page, exc)
-            break
-
-    logging.info("SHAB API: Total %d HR01 entries fetched for %s to %s",
-                 len(all_results), datum_von, datum_bis)
-    return all_results
-
-
-def fetch_shab_notice_details(notice_id: str) -> dict:
-    """Fetch full details for a single SHAB notice."""
-    url = f"https://www.shab.ch/api/v1/public/document/shab/notice/{notice_id}"
-    headers = {"Accept": "application/json", "Accept-Language": "de"}
+    headers = {
+        "Accept": "application/json",
+        "Accept-Language": "de",
+    }
 
     try:
-        resp = http_requests.get(url, headers=headers, timeout=30)
+        resp = http_requests.get(SHAB_API_URL, params=params, headers=headers, timeout=60)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+
+        results = data.get("content", [])
+        logging.info("SHAB API: %d HR01 entries fetched for %s to %s", len(results), datum_von, datum_bis)
+        return results
+
     except Exception as exc:
-        logging.warning("Failed to fetch SHAB notice %s: %s", notice_id, exc)
-        return {}
+        logging.warning("SHAB API error: %s", exc)
+        return []
 
 
 def ensure_leads_table(cur) -> None:
@@ -1411,45 +1382,44 @@ def sync_shab():
 
                 for pub in publications:
                     try:
-                        pub_id = pub.get("id") or ""
-                        if not pub_id:
+                        meta = pub.get("meta", {})
+                        content = pub.get("content", {})
+                        commons = content.get("commonsNew", {}) or content.get("commonsActual", {})
+                        company = commons.get("company", {})
+                        address = company.get("address", {})
+
+                        uid = company.get("uid") or ""
+                        if not uid:
                             continue
 
-                        # The title often contains company name and location: "Firma AG, Zürich"
-                        title = pub.get("title") or ""
-                        if ", " in title:
-                            firma, ort = title.rsplit(", ", 1)
-                        else:
-                            firma = title
-                            ort = ""
+                        firma = company.get("name") or ""
 
-                        cantons = pub.get("cantons") or []
-                        kanton = cantons[0].upper() if cantons else ""
+                        # Legal form code to name
+                        rechtsform_code = company.get("legalForm") or ""
+                        rechtsform = RECHTSFORMEN.get(str(rechtsform_code), str(rechtsform_code))
 
-                        # Publication date from SHAB
-                        pub_date_raw = pub.get("publicationTime") or ""
+                        # Address fields
+                        strasse = address.get("street") or ""
+                        hausnummer = address.get("houseNumber") or ""
+                        plz = str(address.get("swissZipCode") or "")
+                        ort = address.get("town") or ""
+
+                        sitz = company.get("seat") or ort
+
+                        # Canton from meta
+                        cantons = meta.get("cantons") or []
+                        kanton = cantons[0] if cantons else ""
+
+                        zweck = commons.get("purpose") or ""
+
+                        # Publication date
+                        pub_date_raw = meta.get("publicationDate") or ""
                         try:
                             pub_date = pub_date_raw[:10] if pub_date_raw else None
                         except Exception:
                             pub_date = None
 
-                        # Use publication ID as UID
-                        uid = f"SHAB-{pub_id}"
-
-                        # Fetch full notice details for additional company info
-                        notice_details = fetch_shab_notice_details(pub_id)
-                        notice_text = notice_details.get("notice") or pub.get("notice") or ""
-                        zweck = notice_details.get("purpose") or ""
-
-                        rechtsform = notice_details.get("legalFormText") or ""
-                        address = notice_details.get("address") or {}
-                        strasse = address.get("street") or ""
-                        hausnummer = address.get("houseNumber") or ""
-                        plz = str(address.get("swissZipCode") or "")
-                        sitz = notice_details.get("legalSeat") or ort
-
-                        # Classify industry using notice text
-                        branche = ai_branche(notice_text or zweck) if (notice_text or zweck) else "Sonstige"
+                        branche = ai_branche(zweck)
 
                         cur.execute(
                             """
@@ -1469,17 +1439,21 @@ def sync_shab():
                                 zweck = EXCLUDED.zweck,
                                 branche_ai = EXCLUDED.branche_ai,
                                 publikation_datum = EXCLUDED.publikation_datum
+                            RETURNING (xmax = 0) AS inserted
                             """,
                             (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
-                             sitz, kanton, zweck, branche, pub_date),
+                             sitz, kanton, zweck, branche, pub_date)
                         )
-                        if cur.rowcount == 1:
+
+                        row = cur.fetchone()
+                        if row and row.get("inserted"):
                             inserted += 1
                         else:
                             updated += 1
                     except Exception as exc:
                         logging.warning("Fehler beim Verarbeiten eines SHAB-Eintrags: %s", exc)
                         errors += 1
+                        continue
 
                 conn.commit()
     except Exception as exc:
