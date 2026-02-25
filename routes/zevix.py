@@ -496,6 +496,14 @@ def ai_branche(zweck: str) -> str:
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
     """Fetch HR01 (new registrations) from the Zefix SHAB API."""
+    date_fmt = "%Y-%m-%d"
+    for label, val in (("datum_von", datum_von), ("datum_bis", datum_bis)):
+        try:
+            datetime.strptime(val, date_fmt)
+        except (ValueError, TypeError):
+            logging.warning("Ungültiges Datumsformat für %s: %r (erwartet YYYY-MM-DD)", label, val)
+            return []
+
     payload = {
         "shabDateFrom": datum_von,
         "shabDateTo": datum_bis,
@@ -506,17 +514,40 @@ def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "Accept-Language": "de",
     }
     all_results = []
     offset = 0
+    max_retries = 3
     while True:
         payload["offset"] = offset
-        try:
-            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=60)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as exc:
-            logging.warning("Zefix SHAB API Fehler (offset %d): %s", offset, exc)
+        last_exc = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                last_exc = None
+                break
+            except http_requests.exceptions.HTTPError as exc:
+                body_preview = ""
+                try:
+                    body_preview = resp.text[:200]
+                except Exception:
+                    pass
+                logging.warning(
+                    "Zefix SHAB API HTTP-Fehler (offset %d, Versuch %d/%d): %s – Status %s – Body: %s",
+                    offset, attempt, max_retries, exc, resp.status_code, body_preview,
+                )
+                last_exc = exc
+            except Exception as exc:
+                logging.warning(
+                    "Zefix SHAB API Fehler (offset %d, Versuch %d/%d): %s",
+                    offset, attempt, max_retries, exc,
+                )
+                last_exc = exc
+
+        if last_exc is not None:
             break
 
         results = data.get("list") or []
