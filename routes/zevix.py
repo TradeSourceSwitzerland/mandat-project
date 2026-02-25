@@ -1471,6 +1471,271 @@ def sync_shab():
     })
 
 
+# ---------------------------- CRON SYNC ----------------------------
+@zevix_bp.route("/zevix/cron-sync", methods=["POST"])
+def cron_sync():
+    """
+    Daily cron job to sync SHAB data automatically.
+    Protected by a secret key (not user auth).
+    """
+    cron_secret = request.headers.get("X-Cron-Secret") or (request.get_json(silent=True) or {}).get("cron_secret")
+    expected_secret = os.getenv("CRON_SECRET")
+
+    if not expected_secret or cron_secret != expected_secret:
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    logging.info("CRON: Starting daily SHAB sync for %s", yesterday)
+
+    publications = fetch_shab_neueintragungen(yesterday, yesterday)
+
+    if not publications:
+        logging.info("CRON: No new entries found for %s", yesterday)
+        return jsonify({
+            "success": True,
+            "message": "No new entries",
+            "date": yesterday,
+            "total": 0
+        })
+
+    inserted = 0
+    updated = 0
+    errors = 0
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_leads_table(cur)
+                conn.commit()
+
+                for pub in publications:
+                    try:
+                        meta = pub.get("meta", {})
+                        content = pub.get("content", {})
+                        commons = content.get("commonsNew", {}) or content.get("commonsActual", {})
+                        company = commons.get("company", {})
+                        address = company.get("address", {})
+
+                        uid = company.get("uid") or ""
+                        if not uid:
+                            continue
+
+                        firma = company.get("name") or ""
+                        rechtsform_code = company.get("legalForm") or ""
+                        rechtsform = RECHTSFORMEN.get(str(rechtsform_code), str(rechtsform_code))
+
+                        strasse = address.get("street") or ""
+                        hausnummer = address.get("houseNumber") or ""
+                        plz = str(address.get("swissZipCode") or "")
+                        ort = address.get("town") or ""
+                        sitz = company.get("seat") or ort
+
+                        cantons = meta.get("cantons") or []
+                        kanton = cantons[0] if cantons else ""
+
+                        zweck = commons.get("purpose") or ""
+
+                        pub_date_raw = meta.get("publicationDate") or ""
+                        pub_date = pub_date_raw[:10] if pub_date_raw else None
+
+                        branche = ai_branche(zweck)
+
+                        cur.execute(
+                            """
+                            INSERT INTO leads
+                                (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                                 sitz, kanton, zweck, branche_ai, publikation_datum)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (uid) DO UPDATE SET
+                                firma = EXCLUDED.firma,
+                                rechtsform = EXCLUDED.rechtsform,
+                                strasse = EXCLUDED.strasse,
+                                hausnummer = EXCLUDED.hausnummer,
+                                plz = EXCLUDED.plz,
+                                ort = EXCLUDED.ort,
+                                sitz = EXCLUDED.sitz,
+                                kanton = EXCLUDED.kanton,
+                                zweck = EXCLUDED.zweck,
+                                branche_ai = EXCLUDED.branche_ai,
+                                publikation_datum = EXCLUDED.publikation_datum
+                            RETURNING (xmax = 0) AS inserted
+                            """,
+                            (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                             sitz, kanton, zweck, branche, pub_date)
+                        )
+
+                        row = cur.fetchone()
+                        if row and row.get("inserted"):
+                            inserted += 1
+                        else:
+                            updated += 1
+
+                        if (inserted + updated) % 10 == 0:
+                            conn.commit()
+
+                    except Exception as exc:
+                        logging.warning("CRON: Error processing publication: %s", exc)
+                        errors += 1
+                        continue
+
+                conn.commit()
+
+    except Exception as exc:
+        logging.error("CRON: Database error: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    logging.info("CRON: Completed - inserted=%d, updated=%d, errors=%d", inserted, updated, errors)
+
+    return jsonify({
+        "success": True,
+        "date": yesterday,
+        "total": len(publications),
+        "inserted": inserted,
+        "updated": updated,
+        "errors": errors
+    })
+
+
+# ---------------------------- ADMIN SYNC RANGE ----------------------------
+@zevix_bp.route("/zevix/admin/sync-range", methods=["POST"])
+def admin_sync_range():
+    """Admin endpoint to sync a specific date range (for backfilling data)."""
+    cron_secret = request.headers.get("X-Cron-Secret") or (request.get_json(silent=True) or {}).get("cron_secret")
+    expected_secret = os.getenv("CRON_SECRET")
+
+    if not expected_secret or cron_secret != expected_secret:
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    datum_von = data.get("datum_von")
+    datum_bis = data.get("datum_bis")
+
+    if not datum_von or not datum_bis:
+        return jsonify({"success": False, "error": "datum_von and datum_bis required"}), 400
+
+    datum_von = parse_date_to_iso(datum_von)
+    datum_bis = parse_date_to_iso(datum_bis)
+
+    logging.info("ADMIN SYNC: Starting SHAB sync for %s to %s", datum_von, datum_bis)
+
+    publications = fetch_shab_neueintragungen(datum_von, datum_bis)
+
+    if not publications:
+        logging.info("ADMIN SYNC: No entries found for %s to %s", datum_von, datum_bis)
+        return jsonify({
+            "success": True,
+            "message": "No entries found",
+            "datum_von": datum_von,
+            "datum_bis": datum_bis,
+            "total": 0
+        })
+
+    inserted = 0
+    updated = 0
+    errors = 0
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_leads_table(cur)
+                conn.commit()
+
+                for pub in publications:
+                    try:
+                        meta = pub.get("meta", {})
+                        content = pub.get("content", {})
+                        commons = content.get("commonsNew", {}) or content.get("commonsActual", {})
+                        company = commons.get("company", {})
+                        address = company.get("address", {})
+
+                        uid = company.get("uid") or ""
+                        if not uid:
+                            continue
+
+                        firma = company.get("name") or ""
+                        rechtsform_code = company.get("legalForm") or ""
+                        rechtsform = RECHTSFORMEN.get(str(rechtsform_code), str(rechtsform_code))
+
+                        strasse = address.get("street") or ""
+                        hausnummer = address.get("houseNumber") or ""
+                        plz = str(address.get("swissZipCode") or "")
+                        ort = address.get("town") or ""
+                        sitz = company.get("seat") or ort
+
+                        cantons = meta.get("cantons") or []
+                        kanton = cantons[0] if cantons else ""
+
+                        zweck = commons.get("purpose") or ""
+
+                        pub_date_raw = meta.get("publicationDate") or ""
+                        pub_date = pub_date_raw[:10] if pub_date_raw else None
+
+                        branche = ai_branche(zweck)
+
+                        cur.execute(
+                            """
+                            INSERT INTO leads
+                                (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                                 sitz, kanton, zweck, branche_ai, publikation_datum)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (uid) DO UPDATE SET
+                                firma = EXCLUDED.firma,
+                                rechtsform = EXCLUDED.rechtsform,
+                                strasse = EXCLUDED.strasse,
+                                hausnummer = EXCLUDED.hausnummer,
+                                plz = EXCLUDED.plz,
+                                ort = EXCLUDED.ort,
+                                sitz = EXCLUDED.sitz,
+                                kanton = EXCLUDED.kanton,
+                                zweck = EXCLUDED.zweck,
+                                branche_ai = EXCLUDED.branche_ai,
+                                publikation_datum = EXCLUDED.publikation_datum
+                            RETURNING (xmax = 0) AS inserted
+                            """,
+                            (uid, firma, rechtsform, strasse, hausnummer, plz, ort,
+                             sitz, kanton, zweck, branche, pub_date)
+                        )
+
+                        row = cur.fetchone()
+                        if row and row.get("inserted"):
+                            inserted += 1
+                        else:
+                            updated += 1
+
+                        if (inserted + updated) % 10 == 0:
+                            conn.commit()
+
+                    except Exception as exc:
+                        logging.warning("ADMIN SYNC: Error processing publication: %s", exc)
+                        errors += 1
+                        continue
+
+                conn.commit()
+
+    except Exception as exc:
+        logging.error("ADMIN SYNC: Database error: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    logging.info("ADMIN SYNC: Completed - inserted=%d, updated=%d, errors=%d", inserted, updated, errors)
+
+    return jsonify({
+        "success": True,
+        "datum_von": datum_von,
+        "datum_bis": datum_bis,
+        "total": len(publications),
+        "inserted": inserted,
+        "updated": updated,
+        "errors": errors
+    })
+
+
 # ---------------------------- LEADS ----------------------------
 @zevix_bp.route("/zevix/leads", methods=["GET"])
 def get_leads():
