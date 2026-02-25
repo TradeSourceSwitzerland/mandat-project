@@ -62,7 +62,7 @@ RECHTSFORMEN = {
     "0113": "Zweigniederlassung",
 }
 
-ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/company/search"
+SHAB_API_URL = "https://www.shab.ch/api/v1/public/search/shab/notice"
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -523,45 +523,69 @@ def ai_branche(zweck: str) -> str:
 
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
-    """Fetch new company registrations from the public Zefix API."""
+    """Fetch HR01 (new company registrations) from the official SHAB.ch public API."""
     # Convert dates to ISO format
     datum_von = parse_date_to_iso(datum_von)
     datum_bis = parse_date_to_iso(datum_bis)
 
     all_results = []
+    page = 1
+    pagesize = 100
 
-    for kanton in ALLE_KANTONE:
-        payload = {
-            "registrationDateFrom": datum_von,
-            "registrationDateTo": datum_bis,
-            "legalSeats": [kanton],
-            "maxEntries": 500
+    while True:
+        params = {
+            "heading": "hr",
+            "subheading": "hr01",
+            "publicationTime.from": datum_von,
+            "publicationTime.to": datum_bis,
+            "page": page,
+            "pagesize": pagesize,
         }
 
         headers = {
-            "Content-Type": "application/json",
             "Accept": "application/json",
-            "Accept-Language": "de"
+            "Accept-Language": "de",
         }
 
         try:
-            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=30)
+            resp = http_requests.get(SHAB_API_URL, params=params, headers=headers, timeout=60)
             resp.raise_for_status()
             data = resp.json()
 
-            if isinstance(data, list):
-                results = data
-            else:
-                results = data.get("list") or data.get("companies") or []
-
+            results = data.get("results") or []
             all_results.extend(results)
-            logging.info("Zefix: %d companies found for canton %s", len(results), kanton)
+
+            logging.info("SHAB API: Page %d - %d results fetched (total so far: %d)",
+                         page, len(results), len(all_results))
+
+            # Check if we have more pages
+            page_count = data.get("pageCount", 0)
+            if page >= page_count:
+                break
+
+            page += 1
 
         except Exception as exc:
-            logging.warning("Zefix API error for canton %s: %s", kanton, exc)
-            continue
+            logging.warning("SHAB API error on page %d: %s", page, exc)
+            break
 
+    logging.info("SHAB API: Total %d HR01 entries fetched for %s to %s",
+                 len(all_results), datum_von, datum_bis)
     return all_results
+
+
+def fetch_shab_notice_details(notice_id: str) -> dict:
+    """Fetch full details for a single SHAB notice."""
+    url = f"https://www.shab.ch/api/v1/public/document/shab/notice/{notice_id}"
+    headers = {"Accept": "application/json", "Accept-Language": "de"}
+
+    try:
+        resp = http_requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as exc:
+        logging.warning("Failed to fetch SHAB notice %s: %s", notice_id, exc)
+        return {}
 
 
 def ensure_leads_table(cur) -> None:
@@ -1387,32 +1411,45 @@ def sync_shab():
 
                 for pub in publications:
                     try:
-                        uid = pub.get("uid") or ""
-                        if not uid:
+                        pub_id = pub.get("id") or ""
+                        if not pub_id:
                             continue
 
-                        firma = pub.get("name") or ""
-                        legal_form = pub.get("legalFormId") or pub.get("legalForm")
-                        if isinstance(legal_form, int):
-                            legal_form = str(legal_form).zfill(4)  # 106 → "0106"
-                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(legal_form or ""), "")
+                        # The title often contains company name and location: "Firma AG, Zürich"
+                        title = pub.get("title") or ""
+                        if ", " in title:
+                            firma, ort = title.rsplit(", ", 1)
+                        else:
+                            firma = title
+                            ort = ""
 
-                        address = pub.get("address") or {}
-                        strasse = address.get("street") or ""
-                        hausnummer = address.get("houseNumber") or ""
-                        plz = str(address.get("swissZipCode") or "")
-                        ort = address.get("city") or pub.get("legalSeat") or ""
+                        cantons = pub.get("cantons") or []
+                        kanton = cantons[0].upper() if cantons else ""
 
-                        sitz = pub.get("legalSeat") or ort
-                        kanton = pub.get("cantonIso") or pub.get("canton") or ""
-                        zweck = pub.get("purpose") or ""
-                        pub_date_raw = pub.get("shabDate") or pub.get("registrationDate") or pub.get("shabPubDate") or ""
+                        # Publication date from SHAB
+                        pub_date_raw = pub.get("publicationTime") or ""
                         try:
                             pub_date = pub_date_raw[:10] if pub_date_raw else None
                         except Exception:
                             pub_date = None
 
-                        branche = ai_branche(zweck)
+                        # Use publication ID as UID
+                        uid = f"SHAB-{pub_id}"
+
+                        # Fetch full notice details for additional company info
+                        notice_details = fetch_shab_notice_details(pub_id)
+                        notice_text = notice_details.get("notice") or pub.get("notice") or ""
+                        zweck = notice_details.get("purpose") or ""
+
+                        rechtsform = notice_details.get("legalFormText") or ""
+                        address = notice_details.get("address") or {}
+                        strasse = address.get("street") or ""
+                        hausnummer = address.get("houseNumber") or ""
+                        plz = str(address.get("swissZipCode") or "")
+                        sitz = notice_details.get("legalSeat") or ort
+
+                        # Classify industry using notice text
+                        branche = ai_branche(notice_text or zweck) if (notice_text or zweck) else "Sonstige"
 
                         cur.execute(
                             """
