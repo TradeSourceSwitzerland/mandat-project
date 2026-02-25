@@ -62,8 +62,7 @@ RECHTSFORMEN = {
     "0113": "Zweigniederlassung",
 }
 
-SHAB_API_URL = "https://www.shab.ch/api/v1/publications"
-SHAB_PAGE_SIZE = 2000
+ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/shab/search"
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -496,39 +495,38 @@ def ai_branche(zweck: str) -> str:
 
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
-    """Fetch HR01 (new registrations) from the SHAB API for all cantons."""
-    params = {
-        "subRubrics": "HR01",
-        "includeContent": "true",
-        "publicationStates": "PUBLISHED",
-        "publicationDate": datum_von,
-        "publicationDateEnd": datum_bis,
-        "cantons": ",".join(ALLE_KANTONE),
-        "pageSize": SHAB_PAGE_SIZE,
-        "pageNumber": 0,
+    """Fetch HR01 (new registrations) from the Zefix SHAB API."""
+    payload = {
+        "shabDateFrom": datum_von,
+        "shabDateTo": datum_bis,
+        "subRubric": "HR01",
+        "maxEntries": 2000,
+        "offset": 0,
     }
-    all_publications = []
-    page = 0
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    all_results = []
+    offset = 0
     while True:
-        params["pageNumber"] = page
+        payload["offset"] = offset
         try:
-            resp = http_requests.get(SHAB_API_URL, params=params, timeout=30)
+            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=60)
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            logging.warning("SHAB API Fehler (Seite %d): %s", page, exc)
+            logging.warning("Zefix SHAB API Fehler (offset %d): %s", offset, exc)
             break
 
-        content = data.get("content") or []
-        all_publications.extend(content)
+        results = data.get("list") or []
+        all_results.extend(results)
 
-        # Check pagination
-        total_pages = data.get("totalPages", 1)
-        if page + 1 >= total_pages or not content:
+        if len(results) < payload["maxEntries"]:
             break
-        page += 1
+        offset += len(results)
 
-    return all_publications
+    return all_results
 
 
 def ensure_leads_table(cur) -> None:
@@ -1354,27 +1352,23 @@ def sync_shab():
 
                 for pub in publications:
                     try:
-                        meta = pub.get("meta") or {}
-                        content = (pub.get("content") or {}).get("commonsNew") or {}
-                        company = content.get("company") or {}
-                        address = company.get("address") or {}
-
-                        uid = company.get("uid") or ""
+                        uid = pub.get("uid") or ""
                         if not uid:
                             continue
 
-                        firma = company.get("name") or ""
-                        legal_form_code = str(company.get("legalForm") or "")
-                        rechtsform = RECHTSFORMEN.get(legal_form_code, legal_form_code)
+                        firma = pub.get("name") or ""
+                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(pub.get("legalForm") or ""), "")
+
+                        address = pub.get("address") or {}
                         strasse = address.get("street") or ""
                         hausnummer = address.get("houseNumber") or ""
                         plz = str(address.get("swissZipCode") or "")
-                        ort = address.get("town") or ""
-                        sitz = company.get("seat") or ort
-                        cantons = meta.get("cantons") or []
-                        kanton = cantons[0] if cantons else ""
-                        zweck = content.get("purpose") or ""
-                        pub_date_raw = meta.get("publicationDate") or ""
+                        ort = address.get("city") or pub.get("legalSeat") or ""
+
+                        sitz = pub.get("legalSeat") or ort
+                        kanton = pub.get("canton") or ""
+                        zweck = pub.get("purpose") or ""
+                        pub_date_raw = pub.get("shabDate") or pub.get("shabPubDate") or ""
                         try:
                             pub_date = pub_date_raw[:10] if pub_date_raw else None
                         except Exception:
