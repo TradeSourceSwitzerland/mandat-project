@@ -62,7 +62,7 @@ RECHTSFORMEN = {
     "0113": "Zweigniederlassung",
 }
 
-ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/shab/search"
+ZEFIX_API_URL = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1/company/search"
 
 # ---------------------------- HELPERS ----------------------------
 def normalize_plan(plan: str | None) -> str:
@@ -78,6 +78,34 @@ def normalize_email_candidate(value: str | None) -> str:
     if not local or not domain or "." not in domain:
         return ""
     return email
+
+def parse_date_to_iso(date_str: str) -> str:
+    """Convert various date formats to ISO 8601 (YYYY-MM-DD).
+
+    Supports:
+    - MM/DD/YYYY (American: 02/25/2026)
+    - DD/MM/YYYY (European: 25/02/2026)
+    - YYYY-MM-DD (ISO: 2026-02-25)
+    - DD.MM.YYYY (Swiss/German: 25.02.2026)
+    """
+    if not date_str:
+        return date_str
+
+    formats = [
+        "%Y-%m-%d",  # ISO - already correct
+        "%m/%d/%Y",  # American
+        "%d/%m/%Y",  # European
+        "%d.%m.%Y",  # Swiss/German
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    logging.warning("Could not parse date format: %s, using as-is", date_str)
+    return date_str
+
 
 def default_auth_until_ms() -> int:
     return int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
@@ -495,67 +523,43 @@ def ai_branche(zweck: str) -> str:
 
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
-    """Fetch HR01 (new registrations) from the Zefix SHAB API."""
-    date_fmt = "%Y-%m-%d"
-    for label, val in (("datum_von", datum_von), ("datum_bis", datum_bis)):
-        try:
-            datetime.strptime(val, date_fmt)
-        except (ValueError, TypeError):
-            logging.warning("Ungültiges Datumsformat für %s: %r (erwartet YYYY-MM-DD)", label, val)
-            return []
+    """Fetch new company registrations from the public Zefix API."""
+    # Convert dates to ISO format
+    datum_von = parse_date_to_iso(datum_von)
+    datum_bis = parse_date_to_iso(datum_bis)
 
-    payload = {
-        "shabDateFrom": datum_von,
-        "shabDateTo": datum_bis,
-        "subRubric": "HR01",
-        "maxEntries": 2000,
-        "offset": 0,
-    }
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Accept-Language": "de",
-    }
     all_results = []
-    offset = 0
-    max_retries = 3
-    while True:
-        payload["offset"] = offset
-        last_exc = None
-        for attempt in range(1, max_retries + 1):
-            try:
-                resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=60)
-                resp.raise_for_status()
-                data = resp.json()
-                last_exc = None
-                break
-            except http_requests.exceptions.HTTPError as exc:
-                body_preview = ""
-                try:
-                    body_preview = resp.text[:200]
-                except Exception:
-                    pass
-                logging.warning(
-                    "Zefix SHAB API HTTP-Fehler (offset %d, Versuch %d/%d): %s – Status %s – Body: %s",
-                    offset, attempt, max_retries, exc, resp.status_code, body_preview,
-                )
-                last_exc = exc
-            except Exception as exc:
-                logging.warning(
-                    "Zefix SHAB API Fehler (offset %d, Versuch %d/%d): %s",
-                    offset, attempt, max_retries, exc,
-                )
-                last_exc = exc
 
-        if last_exc is not None:
-            break
+    for kanton in ALLE_KANTONE:
+        payload = {
+            "registrationDateFrom": datum_von,
+            "registrationDateTo": datum_bis,
+            "legalSeats": [kanton],
+            "maxEntries": 500
+        }
 
-        results = data.get("list") or []
-        all_results.extend(results)
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Accept-Language": "de"
+        }
 
-        if len(results) < payload["maxEntries"]:
-            break
-        offset += len(results)
+        try:
+            resp = http_requests.post(ZEFIX_API_URL, json=payload, headers=headers, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if isinstance(data, list):
+                results = data
+            else:
+                results = data.get("list") or data.get("companies") or []
+
+            all_results.extend(results)
+            logging.info("Zefix: %d companies found for canton %s", len(results), kanton)
+
+        except Exception as exc:
+            logging.warning("Zefix API error for canton %s: %s", kanton, exc)
+            continue
 
     return all_results
 
@@ -1366,8 +1370,8 @@ def sync_shab():
 
     data = request_payload() or {}
     today = date.today().isoformat()
-    datum_von = data.get("datum_von") or today
-    datum_bis = data.get("datum_bis") or today
+    datum_von = parse_date_to_iso(data.get("datum_von") or today)
+    datum_bis = parse_date_to_iso(data.get("datum_bis") or today)
 
     publications = fetch_shab_neueintragungen(datum_von, datum_bis)
 
@@ -1388,7 +1392,10 @@ def sync_shab():
                             continue
 
                         firma = pub.get("name") or ""
-                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(pub.get("legalForm") or ""), "")
+                        legal_form = pub.get("legalFormId") or pub.get("legalForm")
+                        if isinstance(legal_form, int):
+                            legal_form = str(legal_form).zfill(4)  # 106 → "0106"
+                        rechtsform = pub.get("legalFormText") or RECHTSFORMEN.get(str(legal_form or ""), "")
 
                         address = pub.get("address") or {}
                         strasse = address.get("street") or ""
@@ -1397,9 +1404,9 @@ def sync_shab():
                         ort = address.get("city") or pub.get("legalSeat") or ""
 
                         sitz = pub.get("legalSeat") or ort
-                        kanton = pub.get("canton") or ""
+                        kanton = pub.get("cantonIso") or pub.get("canton") or ""
                         zweck = pub.get("purpose") or ""
-                        pub_date_raw = pub.get("shabDate") or pub.get("shabPubDate") or ""
+                        pub_date_raw = pub.get("shabDate") or pub.get("registrationDate") or pub.get("shabPubDate") or ""
                         try:
                             pub_date = pub_date_raw[:10] if pub_date_raw else None
                         except Exception:
