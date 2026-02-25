@@ -7,14 +7,7 @@ services:
 
   - type: cron
     name: shab-daily-sync
-    runtime: image
-    image:
-      url: docker.io/curlimages/curl:latest
+    runtime: python
+    buildCommand: pip install -r requirements.txt
     schedule: "0 5 * * *"  # 06:00 AM Swiss time (UTC+1 in winter, UTC+2 in summer)
-    startCommand: >
-      curl -X POST https://mandat-backend.onrender.com/zevix/cron-sync
-      -H "Content-Type: application/json"
-      -H "X-Cron-Secret: $CRON_SECRET"
-    envVars:
-      - key: CRON_SECRET
-        sync: false
+    startCommand: cd /opt/render/project/src && python cron_shab_sync.py
