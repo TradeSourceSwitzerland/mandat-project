@@ -100,6 +100,40 @@ def get_leads_limit(plan: str) -> int:
     return LEADS_LIMIT_BY_PLAN.get(normalize_plan(plan), 0)
 
 
+def parse_date_to_iso(date_str: str) -> str:
+    """Convert various date formats to ISO 8601 (YYYY-MM-DD).
+
+    Supports:
+    - MM/DD/YYYY (American: 02/25/2026)
+    - DD/MM/YYYY (European: 25/02/2026)
+    - YYYY-MM-DD (ISO: 2026-02-25)
+    - DD.MM.YYYY (Swiss/German: 25.02.2026)
+
+    Args:
+        date_str: Date string in any of the supported formats
+
+    Returns:
+        Date string in ISO 8601 format (YYYY-MM-DD)
+    """
+    if not date_str:
+        return date_str
+
+    formats = [
+        "%Y-%m-%d",  # 2026-02-25 (ISO - already correct)
+        "%m/%d/%Y",  # 02/25/2026 (American)
+        "%d/%m/%Y",  # 25/02/2026 (European)
+        "%d.%m.%Y",  # 25.02.2026 (Swiss/German)
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    logging.warning("Could not parse date format: %s, using as-is", date_str)
+    return date_str
+
+
 def create_jwt_token(email: str, plan: str, valid_until: int) -> str:
     expiration = datetime.utcnow() + timedelta(days=30)
     payload = {
@@ -496,6 +530,8 @@ def ai_branche(zweck: str) -> str:
 
 def fetch_shab_neueintragungen(datum_von: str, datum_bis: str) -> list:
     """Fetch HR01 (new registrations) from the Zefix SHAB API."""
+    datum_von = parse_date_to_iso(datum_von)
+    datum_bis = parse_date_to_iso(datum_bis)
     payload = {
         "shabDateFrom": datum_von,
         "shabDateTo": datum_bis,
@@ -1335,8 +1371,8 @@ def sync_shab():
 
     data = request_payload() or {}
     today = date.today().isoformat()
-    datum_von = data.get("datum_von") or today
-    datum_bis = data.get("datum_bis") or today
+    datum_von = parse_date_to_iso(data.get("datum_von") or today)
+    datum_bis = parse_date_to_iso(data.get("datum_bis") or today)
 
     publications = fetch_shab_neueintragungen(datum_von, datum_bis)
 
