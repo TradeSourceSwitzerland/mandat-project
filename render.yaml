@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: mandat-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+
+  - type: cron
+    name: shab-daily-sync
+    runtime: image
+    image:
+      url: docker.io/curlimages/curl:latest
+    schedule: "0 5 * * *"  # 06:00 AM Swiss time (UTC+1 in winter, UTC+2 in summer)
+    startCommand: >
+      curl -X POST https://mandat-backend.onrender.com/zevix/cron-sync
+      -H "Content-Type: application/json"
+      -H "X-Cron-Secret: $CRON_SECRET"
+    envVars:
+      - key: CRON_SECRET
+        sync: false
