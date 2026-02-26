@@ -710,7 +710,6 @@ def login():
         session["email"] = email
         session["plan"] = plan
         session["used"] = used
-        session["used_ids"] = used_ids
 
         logging.info("Login successful for %s, plan: %s", email, plan)
         return response
@@ -806,7 +805,6 @@ def refresh_token():
     session["email"] = email
     session["plan"] = plan
     session["used"] = used
-    session["used_ids"] = used_ids
     
     return response
 
@@ -961,7 +959,6 @@ def export_lead():
             
             # Update session with new values
             session["used"] = new_used
-            session["used_ids"] = new_used_ids
             
             remaining = limit - new_used
             
@@ -1145,7 +1142,6 @@ def export_leads_batch():
             
             # Update session with new values
             session["used"] = new_used
-            session["used_ids"] = new_used_ids
             
             remaining = limit - new_used
             
