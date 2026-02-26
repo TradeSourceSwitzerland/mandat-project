@@ -1751,7 +1751,6 @@ def get_leads():
     """
     Returns leads from the database with optional filtering.
     Requires a valid JWT token.
-    Includes 'exported' flag per lead based on user's usage history for the current month.
     """
     auth_header = request.headers.get("Authorization", "")
     token = None
@@ -1811,30 +1810,6 @@ def get_leads():
                 ensure_leads_table(cur)
                 conn.commit()
 
-                # Get user's exported lead IDs for current month
-                month = get_month_key()
-                cur.execute(
-                    """
-                    SELECT used_ids
-                    FROM usage
-                    WHERE user_email = %s AND month = %s
-                    """,
-                    (user_email, month),
-                )
-                usage_row = cur.fetchone()
-
-                # Parse used_ids - handle both JSONB and string cases
-                exported_ids_set = set()
-                if usage_row:
-                    used_ids_raw = usage_row.get("used_ids")
-                    if isinstance(used_ids_raw, str):
-                        try:
-                            exported_ids_set = set(json.loads(used_ids_raw) if used_ids_raw else [])
-                        except (json.JSONDecodeError, TypeError):
-                            exported_ids_set = set()
-                    elif isinstance(used_ids_raw, list):
-                        exported_ids_set = set(used_ids_raw)
-
                 query = f"""
                     SELECT id, uid, firma, rechtsform, strasse, hausnummer, plz, ort,
                            sitz, kanton, zweck, branche_ai, publikation_datum, created_at
@@ -1867,7 +1842,6 @@ def get_leads():
                         "branche_ai": row.get("branche_ai"),
                         "publikation_datum": pub_date.isoformat() if pub_date else None,
                         "created_at": created_at.isoformat() if created_at else None,
-                        "exported": uid in exported_ids_set,
                     })
 
     except Exception as exc:
