@@ -241,6 +241,23 @@ def apply_checkout_result_to_user(checkout_session: dict) -> tuple[bool, str]:
                     """,
                     (new_plan, default_auth_until_ms(), email),
                 )
+
+                # Reset usage on plan upgrade
+                if plan_rank(new_plan) > plan_rank(old_plan):
+                    month = get_month_key()
+                    logging.info(
+                        "Plan upgrade detected for %s: %s -> %s. Resetting usage for %s",
+                        email, old_plan, new_plan, month,
+                    )
+                    cur.execute(
+                        """
+                        UPDATE usage
+                        SET used = 0, used_ids = '[]'::jsonb
+                        WHERE user_email = %s AND month = %s
+                        """,
+                        (email, month),
+                    )
+
                 conn.commit()
                 
                 # Invalidate cache for immediate synchronization
