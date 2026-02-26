@@ -413,6 +413,20 @@ def sync_user_plan_from_stripe(email: str, current_plan: str, force: bool = Fals
                             """,
                             (reconciled_plan, default_auth_until_ms(), email),
                         )
+                        if plan_rank(reconciled_plan) > plan_rank(normalized_current_plan):
+                            month = get_month_key()
+                            logging.info(
+                                "Plan upgrade detected for %s: %s -> %s. Resetting usage for %s",
+                                email, normalized_current_plan, reconciled_plan, month,
+                            )
+                            cur.execute(
+                                """
+                                UPDATE usage
+                                SET used = 0, used_ids = '[]'::jsonb
+                                WHERE user_email = %s AND month = %s
+                                """,
+                                (email, month),
+                            )
                     conn.commit()
             except Exception as exc:
                 logging.warning("Lokales Plan-Reconciliation fehlgeschlagen, email=%s, error=%s", email, exc)
