@@ -23,7 +23,13 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Cookies über Cross-Site Requests erlauben (Webflow -> Backend)
 CORS(app,
      supports_credentials=True,
-     origins=["https://www.zevix.ch", "https://zevix.ch", "https://zevix.webflow.io"],
+     origins=[
+         "https://www.zevix.ch",
+         "https://zevix.ch",
+         "https://zevix.webflow.io",
+         "https://www.tradesource.ch",
+         "https://tradesource.ch"
+     ],
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"])
 
