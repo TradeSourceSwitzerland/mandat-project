@@ -190,7 +190,7 @@ Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
 
-Deine Anfrage wurde erfolgreich an Deine Versicherung weitergeleitet.
+Deine Anfrage wird bearbeitet.
 
 Mit freundlichen Grüssen  
 Dein TradeSource-Team
