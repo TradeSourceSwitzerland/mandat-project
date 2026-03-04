@@ -446,7 +446,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (enableLetter.checked) requestAnimationFrame(() => initSignaturePad(true));
   });
 
-
+  const EXCEL_URLS = [
+    "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6981481c65c177045e58fbd2_shab_zefix_adressen_2026-02-03_0157.xlsx",
+    "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6981e013411c191e07751015_shab_zefix_adressen_2026-02-03_1144.xlsx"
+  ];
 
   const AMTOVZ_URL =
     "https://cdn.prod.website-files.com/697fc01635a17b168514ed0d/6988e6d3f981ef94ec83994a_AMTOVZ_CSV_LV95.csv";
@@ -918,38 +921,17 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   (async()=>{
-    status.innerText = "⏳ Lade Leads vom Server…";
+    status.innerText = "⏳ Laden…";
 
     await loadAMTOVZ();
 
-    try {
-      const token = localStorage.getItem("auth_token");
-      const res = await fetch(API + "/zevix/leads?limit=5000", {
-        headers: { "Authorization": `Bearer ${token}` },
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Fehler beim Laden der Leads-Daten vom Server");
-      rows = data.leads.map(lead => ({
-        Firma: lead.firma || "",
-        Rechtsform: lead.rechtsform || "",
-        Strasse: lead.strasse ? `${lead.strasse} ${lead.hausnummer || ""}`.trim() : "",
-        PLZ: lead.plz || "",
-        Ort: lead.ort || "",
-        Sitz: lead.sitz || "",
-        Kanton: lead.kanton || "",
-        Zweck: lead.zweck || "",
-        Branche_AI: lead.branche_ai || "",
-        Datum: lead.publikation_datum || "",
-        UID: lead.uid || "",
-        id: lead.id
-      }));
-      status.innerText = `✅ ${rows.length} Leads geladen`;
-    } catch (err) {
-      status.innerText = "❌ Fehler beim Laden: " + err.message;
-      throw err;
-    }
+    const sheets = await Promise.all(EXCEL_URLS.map(async u=>{
+      const r = await fetch(u);
+      const b = await r.arrayBuffer();
+      const wb = XLSX.read(b,{type:"array"});
+      return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    }));
+    rows = sheets.flat();
 
     const kantone  = uniqSorted(rows.map(r => getKantonFromRow(r)).filter(Boolean));
     const branchen = uniqSorted(rows.map(r => String(r.Branche_AI || "").trim()).filter(Boolean));
