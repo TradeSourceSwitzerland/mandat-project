@@ -220,7 +220,7 @@ Partner der INP Finanz GmbH
           <p style="margin:0 0 12px 0;">Hallo {name},</p>
           <p style="margin:0 0 12px 0;">Vielen Dank für dein Vertrauen und deine Mandatsanfrage.</p>
           <p style="margin:0 0 18px 0;">
-            Wir haben deine Unterlagen erhalten und {weiterleitung_text}.<br><br>
+            Wir haben deine Unterlagen erhalten und {weiterleitung_text}.<br>
             Falls Informationen fehlen, melden wir uns direkt bei dir.
           </p>
 
