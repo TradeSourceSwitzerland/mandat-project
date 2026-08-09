@@ -24,23 +24,25 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Cookies über Cross-Site Requests erlauben (Webflow -> Backend)
-CORS(app,
-     supports_credentials=True,
-     origins=[
-         "https://www.zevix.ch",
-         "https://zevix.ch",
-         "https://zevix.webflow.io",
-         "https://www.tradesource.ch",
-         "https://tradesource.ch"
-     ],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "OPTIONS"])
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "https://www.zevix.ch",
+        "https://zevix.ch",
+        "https://zevix.webflow.io",
+        "https://www.tradesource.ch",
+        "https://tradesource.ch",
+    ],
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "OPTIONS"],
+)
 
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='None',  # Required for cross-origin cookies
-    SESSION_COOKIE_DOMAIN=None
+    SESSION_COOKIE_SAMESITE="None",  # Required for cross-origin cookies
+    SESSION_COOKIE_DOMAIN=None,
 )
 
 # ZEVIX Blueprint registrieren
@@ -49,7 +51,12 @@ app.register_blueprint(zevix_bp)
 
 @app.before_request
 def log_request():
-    logging.info("Incoming request: %s %s from %s", request.method, request.path, request.remote_addr)
+    logging.info(
+        "Incoming request: %s %s from %s",
+        request.method,
+        request.path,
+        request.remote_addr,
+    )
 
 
 @app.route("/zevix/login", methods=["OPTIONS"])
@@ -114,10 +121,7 @@ def show_leads():
 def sendmail():
     # Config erst zur Laufzeit prüfen (nicht beim App-Start!)
     if not EMAIL_HOST_PASSWORD:
-        return jsonify({
-            "success": False,
-            "error": "Mail configuration missing"
-        }), 500
+        return jsonify({"success": False, "error": "Mail configuration missing"}), 500
 
     try:
         data = request.json or {}
@@ -204,7 +208,7 @@ TradeSource Switzerland GmbH
                 kunden_msg.attach(MIMEText(kunden_text, "plain", "utf-8"))
 
             else:
-                # Standard-Mail: Inline-Bild + persönliche Signatur
+                # Standard-Mail: schönes Layout + kleines Inline-Bild + persönliche Signatur
                 kunden_subject = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
                 kunden_text = f"""\
 Hallo {name},
@@ -227,22 +231,36 @@ TradeSource Switzerland GmbH
 
                 html_text = f"""\
 <html>
-  <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
-    <p>Hallo {name},</p>
-    <p>Vielen Dank für Dein Vertrauen!</p>
-    <p>Deine Anfrage wird bearbeitet.</p>
+  <body style="margin:0;padding:0;background:#ffffff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;">
+      <tr>
+        <td align="left" style="padding:24px 20px 10px 20px; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:16px; line-height:1.6;">
+          <p style="margin:0 0 12px 0;">Hallo {name},</p>
+          <p style="margin:0 0 12px 0;">Vielen Dank für Dein Vertrauen!</p>
+          <p style="margin:0 0 18px 0;">Deine Anfrage wird bearbeitet.</p>
 
-    <p style="margin-top: 18px;">
-      Freundliche Grüsse<br>
-      <strong>Raul Tito</strong><br>
-      Geschäftsführer<br>
-      TradeSource Switzerland GmbH
-    </p>
-
-    <p style="margin-top: 14px;">
-      <img src="cid:{image_cid}" alt="Raul Tito"
-           style="max-width: 280px; height: auto; border-radius: 8px;">
-    </p>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:8px;">
+            <tr>
+              <td style="padding:0 14px 0 0; vertical-align:top;">
+                <img src="cid:{image_cid}" alt="Raul Tito" width="160"
+                     style="display:block; width:160px; max-width:160px; height:auto; border-radius:8px; border:0;">
+              </td>
+              <td style="vertical-align:top; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:14px; line-height:1.5;">
+                <p style="margin:0 0 8px 0;">Freundliche Grüsse</p>
+                <p style="margin:0; font-size:16px; font-weight:700; color:#111111;">Raul Tito</p>
+                <p style="margin:2px 0 0 0; color:#444444;">Geschäftsführer</p>
+                <p style="margin:6px 0 0 0; color:#111111;">TradeSource Switzerland GmbH</p>
+                <p style="margin:6px 0 0 0; color:#444444;">
+                  <a href="tel:+41438830007" style="color:#444444; text-decoration:none;">043 883 00 07</a><br>
+                  <a href="tel:+41765720019" style="color:#444444; text-decoration:none;">076 572 00 19</a><br>
+                  <a href="mailto:info@tradesource.ch" style="color:#444444; text-decoration:none;">info@tradesource.ch</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
 """
@@ -303,9 +321,9 @@ END:VCARD
 # ----------------------------
 # Optional: Static Datei direkt ausliefern
 # ----------------------------
-@app.route('/static/<path:filename>')
+@app.route("/static/<path:filename>")
 def custom_static(filename):
-    return send_from_directory('static', filename)
+    return send_from_directory("static", filename)
 
 
 # ----------------------------
