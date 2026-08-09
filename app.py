@@ -274,7 +274,7 @@ TradeSource Switzerland GmbH
 
                     img = MIMEImage(img_data, _subtype="jpeg")
                     img.add_header("Content-ID", f"<{image_cid}>")
-                    img.add_header("Content-Disposition", 'inline; filename="raul-tito.jpg"')
+                    img.add_header("Content-Disposition", "inline")  # ohne filename
                     kunden_msg.attach(img)
                 except Exception as img_err:
                     print("Inline-Bild konnte nicht geladen werden:", str(img_err))
