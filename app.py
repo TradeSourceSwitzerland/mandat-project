@@ -231,7 +231,7 @@ Partner der INP Finanz GmbH
                      style="display:block; width:160px; max-width:160px; height:auto; border-radius:8px; border:0;">
               </td>
               <td style="vertical-align:top; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:14px; line-height:1.5;">
-                <p style="margin:0 0 8px 0;">Freundliche Grüsse</p>
+                <p style="margin:0 0 8px 0; text-align:left;">Freundliche Grüsse</p>
                 <p style="margin:0; font-size:16px; font-weight:700; color:#111111;">Raul Tito</p>
                 <p style="margin:2px 0 0 0; color:#444444;">Geschäftsführer</p>
                 <p style="margin:6px 0 0 0; color:#111111;">TradeSource Switzerland GmbH</p>
