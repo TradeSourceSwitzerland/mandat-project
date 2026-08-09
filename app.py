@@ -185,7 +185,7 @@ TradeSource Switzerland GmbH
 
             else:
                 # Standard-Zweig
-                kunden_subject = "Gratis Vignette: Bestätigung deiner Mandatsanfrage – TradeSource Switzerland"
+                kunden_subject = "Gratis Vignette: Bestätigung deiner Mandatsanfrage"
                 weiterleitung_text = (
                     f"an {versicherung_name} zur Prüfung weitergeleitet"
                     if versicherung_name
@@ -198,6 +198,7 @@ Hallo {name},
 Vielen Dank für dein Vertrauen und deine Mandatsanfrage.
 
 Wir haben deine Unterlagen erhalten und {weiterleitung_text}.
+
 Falls Informationen fehlen, melden wir uns direkt bei dir.
 
 Freundliche Grüsse
