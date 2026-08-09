@@ -20,10 +20,8 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key")
-# HTTPS-Information von Reverse-Proxies (z. B. Render) korrekt übernehmen
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Cookies über Cross-Site Requests erlauben (Webflow -> Backend)
 CORS(
     app,
     supports_credentials=True,
@@ -41,22 +39,16 @@ CORS(
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="None",  # Required for cross-origin cookies
+    SESSION_COOKIE_SAMESITE="None",
     SESSION_COOKIE_DOMAIN=None,
 )
 
-# ZEVIX Blueprint registrieren
 app.register_blueprint(zevix_bp)
 
 
 @app.before_request
 def log_request():
-    logging.info(
-        "Incoming request: %s %s from %s",
-        request.method,
-        request.path,
-        request.remote_addr,
-    )
+    logging.info("Incoming request: %s %s from %s", request.method, request.path, request.remote_addr)
 
 
 @app.route("/zevix/login", methods=["OPTIONS"])
@@ -69,31 +61,23 @@ def login_options():
     return response, 200
 
 
-# ----------------------------
-# Health‑Check für Wake‑Up Pings
-# ----------------------------
 @app.route("/healthz", methods=["HEAD"])
 def healthz():
     return "", 200
 
 
-# ----------------------------
-# Konfiguration via Umgebungsvariablen
-# ----------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.ionos.de")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465").strip())
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
 
-# Branding / Profil
+# Branding
 INLINE_IMAGE_URL = "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/69a37a7078f60a1070a61734_RT%20Portrait.JPEG"
+SIGNATURE_IMAGE_URL = "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/69a37a3f4a7f3504c93be36e_Digital%20Sign%20RT.png"
 SENDER_DISPLAY_NAME = "Raul Tito | TradeSource Switzerland GmbH"
 
 
-# ----------------------------
-# HTML-Formular anzeigen
-# ----------------------------
 @app.route("/mandat")
 def show_mandat_form():
     return render_template("mandat.html")
@@ -114,12 +98,8 @@ def show_leads():
     return render_template("leads.html")
 
 
-# ----------------------------
-# API: PDF per Mail versenden
-# ----------------------------
 @app.route("/api/sendmail", methods=["POST"])
 def sendmail():
-    # Config erst zur Laufzeit prüfen (nicht beim App-Start!)
     if not EMAIL_HOST_PASSWORD:
         return jsonify({"success": False, "error": "Mail configuration missing"}), 500
 
@@ -131,7 +111,7 @@ def sendmail():
         name = data.get("name", "")
         email = data.get("email", "")
         geburtsdatum = data.get("geburtsdatum", "")
-        pdf_base64 = data.get("pdf_base64", None)
+        pdf_base64 = data.get("pdf_base64")
         filename = data.get("filename", "mandat.pdf")
 
         mailtext = f"""
@@ -142,7 +122,7 @@ Geburtsdatum: {geburtsdatum}
 E-Mail: {email}
 """
 
-        # Admin-Mail
+        # -------- Admin-Mail --------
         msg = MIMEMultipart()
         msg["Subject"] = f"{name}, Neue Mandatsformular Anfrage"
         msg["From"] = EMAIL_HOST_USER
@@ -164,22 +144,19 @@ E-Mail: {email}
 
         context = ssl.create_default_context()
 
-        # Sende interne Mail an Admin
         with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
             server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
             server.sendmail(EMAIL_HOST_USER, EMAIL_TO, msg.as_string())
 
         print("E-Mail an Admin erfolgreich gesendet ✅")
 
-        # --------
-        # Sende Bestätigungsmail an den Kunden
-        # --------
+        # -------- Kundenmail --------
         if email:
             kunden_msg = MIMEMultipart("mixed")
             kunden_msg["From"] = formataddr((SENDER_DISPLAY_NAME, EMAIL_HOST_USER))
             kunden_msg["To"] = email
 
-            # Kontakter bestimmen (BLEIBT WIE BISHER)
+            # Kontakter bestimmen (unverändert)
             if form_source == "mandat_copy":
                 kontakter = "Dardan Bajrami"
             elif form_source == "mandat_jetmir":
@@ -187,7 +164,6 @@ E-Mail: {email}
             else:
                 kontakter = None
 
-            # Kundenmail-Inhalte
             if kontakter:
                 kunden_subject = "Bestätigung: Mandat erfolgreich eingereicht"
                 kunden_text = f"""\
@@ -203,21 +179,30 @@ Bei Rückfragen stehen wir dir jederzeit gerne zur Verfügung.
 Freundliche Grüsse
 TradeSource Switzerland GmbH
 """
-                # Kontakter-Zweig unverändert: plain text
                 kunden_msg["Subject"] = kunden_subject
                 kunden_msg.attach(MIMEText(kunden_text, "plain", "utf-8"))
 
             else:
-                # Standard-Mail: schönes Layout + kleines Inline-Bild + persönliche Signatur
+                # Premium-Standardmail (email-safe)
                 kunden_subject = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
                 kunden_text = f"""\
 Hallo {name},
 
 Vielen Dank für Dein Vertrauen!
 
-Deine Anfrage wird bearbeitet.
+In der Versicherungsberatung entscheidet nicht die schönste Offerte – sondern die Lösung,
+die im Alltag und insbesondere im Schadenfall zuverlässig trägt.
 
-Freundliche Grüsse
+Unser Anspruch ist eine Arbeitsweise, die Sie jederzeit nachvollziehen können:
+fundierte Empfehlungen, lückenlose Dokumentation und eine Begleitung,
+die weit über den Vertragsabschluss hinausreicht.
+
+Wir verbinden persönliche Erreichbarkeit mit strukturierten Prozessen –
+damit aus Komplexität Klarheit wird und Sie Ihre Entscheidungen mit Überzeugung treffen können.
+
+Herzlichen Dank für Ihr Vertrauen.
+
+Mit freundlichen Grüssen
 Raul Tito
 Geschäftsführer
 TradeSource Switzerland GmbH
@@ -227,34 +212,88 @@ TradeSource Switzerland GmbH
                 alt_part = MIMEMultipart("alternative")
                 alt_part.attach(MIMEText(kunden_text, "plain", "utf-8"))
 
-                image_cid = "raul_portrait"
+                portrait_cid = "raul_portrait"
+                sign_cid = "raul_sign"
 
                 html_text = f"""\
+<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#ffffff;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;">
+  <body style="margin:0;padding:0;background:#060b14;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#060b14;padding:20px 0;">
       <tr>
-        <td align="left" style="padding:24px 20px 10px 20px; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:16px; line-height:1.6;">
-          <p style="margin:0 0 12px 0;">Hallo {name},</p>
-          <p style="margin:0 0 12px 0;">Vielen Dank für Dein Vertrauen!</p>
-          <p style="margin:0 0 18px 0;">Deine Anfrage wird bearbeitet.</p>
-
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:8px;">
+        <td align="center">
+          <table role="presentation" width="940" cellspacing="0" cellpadding="0" border="0" style="width:940px;max-width:94%;border:1px solid #233142;border-radius:14px;overflow:hidden;background:#0b1422;">
             <tr>
-              <td style="padding:0 14px 0 0; vertical-align:top;">
-                <img src="cid:{image_cid}" alt="Raul Tito" width="160"
-                     style="display:block; width:160px; max-width:160px; height:auto; border-radius:8px; border:0;">
+              <!-- Linke Bildspalte -->
+              <td width="36%" valign="top" style="background:#0b1422;border-right:1px solid #1a2638;">
+                <img src="cid:{portrait_cid}" alt="Raul Tito" width="100%" style="display:block;width:100%;height:auto;border:0;max-height:560px;object-fit:cover;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#111a28;">
+                  <tr>
+                    <td style="padding:10px 14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.3;color:#ffffff;">
+                      <strong style="font-size:15px;">Raul Tito</strong>
+                      <span style="color:#a8935e;"> &nbsp;·&nbsp; Geschäftsführer</span>
+                      <span style="color:#9ba8ba;"> &nbsp;·&nbsp; ZÜRICH</span>
+                    </td>
+                  </tr>
+                </table>
               </td>
-              <td style="vertical-align:top; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:14px; line-height:1.5;">
-                <p style="margin:0 0 8px 0;">Freundliche Grüsse</p>
-                <p style="margin:0; font-size:16px; font-weight:700; color:#111111;">Raul Tito</p>
-                <p style="margin:2px 0 0 0; color:#444444;">Geschäftsführer</p>
-                <p style="margin:6px 0 0 0; color:#111111;">TradeSource Switzerland GmbH</p>
-                <p style="margin:6px 0 0 0; color:#444444;">
-                  <a href="tel:+41438830007" style="color:#444444; text-decoration:none;">043 883 00 07</a><br>
-                  <a href="tel:+41765720019" style="color:#444444; text-decoration:none;">076 572 00 19</a><br>
-                  <a href="mailto:info@tradesource.ch" style="color:#444444; text-decoration:none;">info@tradesource.ch</a>
+
+              <!-- Rechte Textspalte -->
+              <td width="64%" valign="top" style="padding:26px 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;color:#eaf0f6;">
+                <h2 style="margin:0 0 16px 0;font-size:40px;line-height:1.1;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-weight:700;">Ein persönliches Wort</h2>
+
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:14px;">
+                  <tr>
+                    <td style="width:4px;background:#a8935e;border-radius:2px;"></td>
+                    <td style="padding-left:10px;font-size:38px;line-height:1.2;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-weight:700;">
+                      Sehr geehrte Damen und Herren
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 14px 0;font-size:31px;line-height:1.72;color:#e6edf5;">
+                  In der Versicherungsberatung entscheidet nicht die schönste Offerte – sondern die Lösung,
+                  die im Alltag und insbesondere im Schadenfall zuverlässig trägt.
                 </p>
+
+                <p style="margin:0 0 14px 0;font-size:31px;line-height:1.72;color:#e6edf5;">
+                  Unser Anspruch ist eine Arbeitsweise, die Sie jederzeit nachvollziehen können:
+                  fundierte Empfehlungen, lückenlose Dokumentation und eine Begleitung,
+                  die weit über den Vertragsabschluss hinausreicht.
+                </p>
+
+                <p style="margin:0 0 14px 0;font-size:31px;line-height:1.72;color:#e6edf5;">
+                  Wir verbinden persönliche Erreichbarkeit mit strukturierten Prozessen –
+                  damit aus Komplexität Klarheit wird und Sie Ihre Entscheidungen mit Überzeugung treffen können.
+                </p>
+
+                <p style="margin:0 0 16px 0;font-size:31px;line-height:1.72;color:#ffffff;">
+                  Herzlichen Dank für Ihr Vertrauen.
+                </p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #1f2d40;padding-top:14px;margin-top:10px;">
+                  <tr>
+                    <td valign="bottom" style="font-family:Arial,Helvetica,sans-serif;color:#dfe7f0;">
+                      <p style="margin:0 0 6px 0;font-size:12px;color:#aeb9c8;">Mit freundlichen Grüssen</p>
+                      <p style="margin:0;font-size:28px;font-weight:700;color:#ffffff;">Raul Tito</p>
+                      <p style="margin:4px 0 0 0;font-size:11px;color:#93a3b8;">TradeSource Switzerland</p>
+                    </td>
+                    <td valign="bottom" align="right">
+                      <img src="cid:{sign_cid}" alt="Unterschrift Raul Tito" width="150" style="display:block;width:150px;max-width:150px;height:auto;border:0;opacity:.95;">
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <table role="presentation" width="940" cellspacing="0" cellpadding="0" border="0" style="width:940px;max-width:94%;margin-top:10px;">
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#8ea0b6;padding:0 4px;">
+                TradeSource Switzerland GmbH ·
+                <a href="tel:+41438830007" style="color:#8ea0b6;text-decoration:none;">043 883 00 07</a> ·
+                <a href="tel:+41765720019" style="color:#8ea0b6;text-decoration:none;">076 572 00 19</a> ·
+                <a href="mailto:info@tradesource.ch" style="color:#8ea0b6;text-decoration:none;">info@tradesource.ch</a>
               </td>
             </tr>
           </table>
@@ -267,26 +306,35 @@ TradeSource Switzerland GmbH
                 alt_part.attach(MIMEText(html_text, "html", "utf-8"))
                 kunden_msg.attach(alt_part)
 
-                # Bild inline laden (mit Fallback)
+                # Portrait laden
                 try:
                     with urlopen(INLINE_IMAGE_URL, timeout=10) as resp:
                         img_data = resp.read()
-
-                    img = MIMEImage(img_data, _subtype="jpeg")
-                    img.add_header("Content-ID", f"<{image_cid}>")
-                    img.add_header("Content-Disposition", "inline")  # ohne filename
-                    kunden_msg.attach(img)
+                    portrait = MIMEImage(img_data, _subtype="jpeg")
+                    portrait.add_header("Content-ID", f"<{portrait_cid}>")
+                    portrait.add_header("Content-Disposition", "inline")
+                    kunden_msg.attach(portrait)
                 except Exception as img_err:
-                    print("Inline-Bild konnte nicht geladen werden:", str(img_err))
-                    # Kein Abbruch: Mail geht trotzdem raus
+                    print("Portrait konnte nicht geladen werden:", str(img_err))
 
-            # Optional: PDF auch an den Kunden anhängen
+                # Signatur laden (optional)
+                try:
+                    with urlopen(SIGNATURE_IMAGE_URL, timeout=10) as resp:
+                        sig_data = resp.read()
+                    sign_img = MIMEImage(sig_data, _subtype="png")
+                    sign_img.add_header("Content-ID", f"<{sign_cid}>")
+                    sign_img.add_header("Content-Disposition", "inline")
+                    kunden_msg.attach(sign_img)
+                except Exception as sig_err:
+                    print("Signaturbild konnte nicht geladen werden:", str(sig_err))
+
+            # PDF optional an Kunden
             if pdf_bytes:
                 part = MIMEApplication(pdf_bytes, Name=filename)
                 part["Content-Disposition"] = f'attachment; filename="{filename}"'
                 kunden_msg.attach(part)
 
-            # V-Card anhängen (für iPhone/Outlook etc.)
+            # V-Card
             vcard = """BEGIN:VCARD
 VERSION:3.0
 N:Tito;Raul;;;
@@ -318,16 +366,10 @@ END:VCARD
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ----------------------------
-# Optional: Static Datei direkt ausliefern
-# ----------------------------
 @app.route("/static/<path:filename>")
 def custom_static(filename):
     return send_from_directory("static", filename)
 
 
-# ----------------------------
-# Lokaler Start
-# ----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
