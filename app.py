@@ -184,7 +184,7 @@ TradeSource Switzerland GmbH
                 kunden_msg.attach(MIMEText(kunden_text, "plain", "utf-8"))
 
             else:
-                # Standard-Zweig: mit Versicherungsname (falls vorhanden), Partner-Hinweis nur unten
+                # Standard-Zweig
                 kunden_subject = "Gratis Vignette: Bestätigung deiner Mandatsanfrage – TradeSource Switzerland"
                 weiterleitung_text = (
                     f"an {versicherung_name} zur Prüfung weitergeleitet"
@@ -250,7 +250,7 @@ Partner der INP Finanz GmbH
 </html>
 """
 
-                # Korrekte MIME-Struktur: mixed > related > alternative
+                # MIME-Struktur: mixed > related > alternative
                 related_part = MIMEMultipart("related")
                 alt_part = MIMEMultipart("alternative")
                 alt_part.attach(MIMEText(kunden_text, "plain", "utf-8"))
