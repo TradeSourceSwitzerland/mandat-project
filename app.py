@@ -111,6 +111,7 @@ def sendmail():
         geburtsdatum = data.get("geburtsdatum", "")
         pdf_base64 = data.get("pdf_base64")
         filename = data.get("filename", "mandat.pdf")
+        versicherung_name = data.get("versicherung_name", "").strip()
 
         mailtext = f"""
 Neue Mandatsanfrage:
@@ -118,6 +119,7 @@ Neue Mandatsanfrage:
 Name: {name}
 Geburtsdatum: {geburtsdatum}
 E-Mail: {email}
+Versicherung: {versicherung_name or "-"}
 """
 
         # -------- Admin-Mail --------
@@ -182,19 +184,27 @@ TradeSource Switzerland GmbH
                 kunden_msg.attach(MIMEText(kunden_text, "plain", "utf-8"))
 
             else:
-                # Standard-Zweig: schlicht + kleines Inline-Bild + Signatur
-                kunden_subject = "Gratis Vignette! Deine Mandatsanfrage bei TradeSource"
+                # Standard-Zweig: mit Versicherungsname (falls vorhanden), Partner-Hinweis nur unten
+                kunden_subject = "Gratis Vignette: Bestätigung deiner Mandatsanfrage – TradeSource Switzerland"
+                weiterleitung_text = (
+                    f"an {versicherung_name} zur Prüfung weitergeleitet"
+                    if versicherung_name
+                    else "zur Prüfung weitergeleitet"
+                )
+
                 kunden_text = f"""\
 Hallo {name},
 
-Vielen Dank für Dein Vertrauen!
+Vielen Dank für dein Vertrauen und deine Mandatsanfrage.
 
-Deine Anfrage wird bearbeitet.
+Wir haben deine Unterlagen erhalten und {weiterleitung_text}.
+Falls Informationen fehlen, melden wir uns direkt bei dir.
 
 Freundliche Grüsse
 Raul Tito
 Geschäftsführer
 TradeSource Switzerland GmbH
+Partner der INP Finanz GmbH
 """
                 kunden_msg["Subject"] = kunden_subject
 
@@ -207,8 +217,11 @@ TradeSource Switzerland GmbH
       <tr>
         <td align="left" style="padding:24px 20px 14px 20px; font-family:Arial,Helvetica,sans-serif; color:#111111; font-size:16px; line-height:1.6;">
           <p style="margin:0 0 12px 0;">Hallo {name},</p>
-          <p style="margin:0 0 12px 0;">Vielen Dank für Dein Vertrauen!</p>
-          <p style="margin:0 0 18px 0;">Deine Anfrage wird bearbeitet.</p>
+          <p style="margin:0 0 12px 0;">Vielen Dank für dein Vertrauen und deine Mandatsanfrage.</p>
+          <p style="margin:0 0 18px 0;">
+            Wir haben deine Unterlagen erhalten und {weiterleitung_text}.<br>
+            Falls Informationen fehlen, melden wir uns direkt bei dir.
+          </p>
 
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:8px;">
             <tr>
@@ -221,6 +234,7 @@ TradeSource Switzerland GmbH
                 <p style="margin:0; font-size:16px; font-weight:700; color:#111111;">Raul Tito</p>
                 <p style="margin:2px 0 0 0; color:#444444;">Geschäftsführer</p>
                 <p style="margin:6px 0 0 0; color:#111111;">TradeSource Switzerland GmbH</p>
+                <p style="margin:2px 0 0 0; color:#666666; font-size:12px;">Partner der INP Finanz GmbH</p>
                 <p style="margin:6px 0 0 0; color:#444444;">
                   <a href="tel:+41438830007" style="color:#444444; text-decoration:none;">043 883 00 07</a><br>
                   <a href="tel:+41765720019" style="color:#444444; text-decoration:none;">076 572 00 19</a><br>
