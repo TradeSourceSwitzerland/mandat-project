@@ -310,6 +310,89 @@ END:VCARD
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ---------------------------------------------------------------------------
+# App: Police hochladen (TradeSource App)
+# Erwartet JSON:
+# { name, geburtsdatum, email, telefon, nachricht,
+#   files: [ { filename, content_type, base64 } ] }
+# Sendet die Dateien als Anhang an EMAIL_TO (info@tradesource.ch).
+# ---------------------------------------------------------------------------
+POLICE_MAX_FILES = 10
+POLICE_MAX_TOTAL_BYTES = 20 * 1024 * 1024  # 20 MB
+POLICE_ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif"}
+
+
+@app.route("/api/upload-police", methods=["POST"])
+def upload_police():
+    if not EMAIL_HOST_PASSWORD:
+        return jsonify({"success": False, "error": "Mail configuration missing"}), 500
+
+    try:
+        data = request.get_json(silent=True) or {}
+        name = (data.get("name") or "").strip()
+        geburtsdatum = (data.get("geburtsdatum") or "").strip()
+        email = (data.get("email") or "").strip()
+        telefon = (data.get("telefon") or "").strip()
+        nachricht = (data.get("nachricht") or "").strip()
+        files = data.get("files") or []
+
+        if not name or not geburtsdatum:
+            return jsonify({"success": False, "error": "Name und Geburtsdatum sind erforderlich."}), 400
+        if not files or not isinstance(files, list):
+            return jsonify({"success": False, "error": "Bitte mindestens eine Datei hochladen."}), 400
+        if len(files) > POLICE_MAX_FILES:
+            return jsonify({"success": False, "error": f"Maximal {POLICE_MAX_FILES} Dateien erlaubt."}), 400
+
+        msg = MIMEMultipart()
+        msg["Subject"] = f"{name}, Police-Upload (App)"
+        msg["From"] = EMAIL_HOST_USER
+        msg["To"] = EMAIL_TO
+        if email:
+            msg["Reply-To"] = email
+
+        mailtext = f"""
+Neuer Police-Upload über die TradeSource App:
+
+Name: {name}
+Geburtsdatum: {geburtsdatum}
+E-Mail: {email or "-"}
+Telefon: {telefon or "-"}
+Nachricht: {nachricht or "-"}
+Anzahl Dateien: {len(files)}
+"""
+        msg.attach(MIMEText(mailtext, "plain", "utf-8"))
+
+        total = 0
+        for i, f in enumerate(files, start=1):
+            ctype = (f.get("content_type") or "application/octet-stream").lower()
+            if ctype not in POLICE_ALLOWED_TYPES:
+                return jsonify({"success": False, "error": f"Dateityp nicht erlaubt: {ctype}"}), 400
+            try:
+                raw = base64.b64decode(f.get("base64") or "", validate=True)
+            except Exception:
+                return jsonify({"success": False, "error": f"Datei {i} ist beschädigt."}), 400
+            total += len(raw)
+            if total > POLICE_MAX_TOTAL_BYTES:
+                return jsonify({"success": False, "error": "Dateien zu gross (max. 20 MB total)."}), 400
+            fname = (f.get("filename") or f"Police_{i}").replace('"', "").replace("\n", " ")[:120]
+            maintype, subtype = ctype.split("/", 1)
+            part = MIMEApplication(raw, _subtype=subtype, Name=fname)
+            part["Content-Disposition"] = f'attachment; filename="{fname}"'
+            msg.attach(part)
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
+            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+            server.sendmail(EMAIL_HOST_USER, EMAIL_TO, msg.as_string())
+
+        logging.info("Police-Upload von %s (%d Dateien, %d Bytes) gesendet", name, len(files), total)
+        return jsonify({"success": True})
+
+    except Exception as e:
+        logging.exception("Fehler in /api/upload-police")
+        return jsonify({"success": False, "error": "Interner Fehler beim Versand."}), 500
+
+
 @app.route("/static/<path:filename>")
 def custom_static(filename):
     return send_from_directory("static", filename)
