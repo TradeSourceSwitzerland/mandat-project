@@ -344,7 +344,9 @@ def upload_police():
             return jsonify({"success": False, "error": f"Maximal {POLICE_MAX_FILES} Dateien erlaubt."}), 400
 
         msg = MIMEMultipart()
-        msg["Subject"] = f"{name}, Police-Upload (App)"
+        # Betreff kann von der App mitgegeben werden (z. B. Vignetten-Anfrage, Offertanfrage)
+        thema = (data.get("betreff") or "Police-Upload").replace("\n", " ").strip()[:60]
+        msg["Subject"] = f"{name}, {thema} (App)"
         msg["From"] = EMAIL_HOST_USER
         msg["To"] = EMAIL_TO
         if email:
