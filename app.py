@@ -72,7 +72,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "info@tradesource.ch")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO", "info@tradesource.ch")
 
-INLINE_IMAGE_URL = "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/69a37a7078f60a1070a61734_RT%20Portrait.JPEG"
+INLINE_IMAGE_URL = "https://cdn.prod.website-files.com/6708fb5e3fc8d4e5e1c21d6c/6add79f838872bf795699f6f_RT.jpg"
 SENDER_DISPLAY_NAME = "Raul Tito | TradeSource Switzerland GmbH"
 
 
